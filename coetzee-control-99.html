@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Admin Control | RubbishRouter</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .admin-card { background: white; border-radius: 20px; padding: 24px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); margin-bottom: 24px; border: 1px solid #f1f5f9; }
+        #admin-content { display: none; }
+        .btn-simulate { background: #8b5cf6; color: white; transition: 0.3s; box-shadow: 0 4px 14px 0 rgba(139, 92, 246, 0.39); }
+        .btn-simulate:hover { background: #7c3aed; transform: translateY(-1px); }
+    </style>
+</head>
+<body class="bg-slate-50 p-4 font-sans text-slate-900">
+
+    <div id="login-screen" class="max-w-md mx-auto mt-32 text-center">
+        <h1 class="text-4xl font-black tracking-tighter text-slate-800">RubbishRouter</h1>
+        <p class="text-slate-400 font-bold text-xs uppercase tracking-widest mt-2 mb-8">Management Portal</p>
+        <input type="password" id="admin-pass" placeholder="Enter Secret Key" class="w-full p-5 rounded-2xl border-2 border-slate-200 mb-4 text-center text-xl outline-none focus:border-slate-800">
+        <button onclick="checkPass()" class="w-full bg-slate-800 text-white p-5 rounded-2xl font-black text-lg shadow-xl hover:bg-black transition-all">UNLOCK DASHBOARD</button>
+    </div>
+
+    <div id="admin-content" class="max-w-6xl mx-auto">
+        <header class="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-6">
+            <div>
+                <h1 class="text-4xl font-black text-slate-900 tracking-tight">Command Center</h1>
+                <div class="flex items-center gap-2 mt-2">
+                    <span class="w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse"></span>
+                    <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Zapper Webhook: ACTIVE</span>
+                </div>
+            </div>
+            
+            <div class="flex gap-3 w-full md:w-auto">
+                <button onclick="simulateRoute()" class="btn-simulate px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest">
+                    🚀 Simulate Potch Route
+                </button>
+                <button onclick="location.reload()" class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 hover:bg-slate-50 text-xl">🔄</button>
+            </div>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            
+            <div class="space-y-6">
+                <div class="admin-card border-t-4 border-purple-500">
+                    <h2 class="text-sm font-black text-slate-400 uppercase tracking-widest mb-6">Activity by Town (Today)</h2>
+                    <div id="town-activity-list" class="space-y-3">
+                        <p class="text-xs text-slate-400 italic">Calculating activity...</p>
+                    </div>
+                </div>
+
+                <div class="admin-card border-t-4 border-blue-500">
+                    <h2 class="text-sm font-black text-slate-400 uppercase tracking-widest mb-6">Town Registry</h2>
+                    <div id="town-list" class="space-y-2 mb-6 max-h-48 overflow-y-auto pr-2"></div>
+                    <div class="flex flex-col gap-2">
+                        <input type="text" id="new-town" placeholder="New Town Name" class="w-full p-3 bg-slate-50 border rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500">
+                        <button onclick="addNewTown()" class="w-full bg-blue-600 text-white py-3 rounded-xl font-black text-xs uppercase hover:bg-blue-700">Add Territory</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="lg:col-span-1">
+                <div class="admin-card border-t-4 border-yellow-400 h-full">
+                    <h2 class="text-sm font-black text-slate-400 uppercase tracking-widest mb-6">Pending Business Ads</h2>
+                    <div id="pending-ads-list" class="space-y-4 text-center py-10 text-slate-300 italic">
+                        No ads pending review.
+                    </div>
+                </div>
+            </div>
+
+            <div class="lg:col-span-1">
+                <div class="admin-card border-t-4 border-orange-400 h-full">
+                    <h2 class="text-sm font-black text-slate-400 uppercase tracking-widest mb-6">Active Ads</h2>
+                    <div id="active-ads-list" class="space-y-4 text-center py-10 text-slate-300 italic">
+                        No active ads.
+                    </div>
+                </div>
+            </div>
+
+            <div class="lg:col-span-1">
+                <div class="admin-card border-t-4 border-green-500 h-full">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-sm font-black text-slate-400 uppercase tracking-widest">Live Feed</h2>
+                        <button onclick="clearLogs()" class="text-[9px] font-black text-red-400 uppercase tracking-widest hover:text-red-600">Clear Logs</button>
+                    </div>
+                    <div id="activity-logs" class="space-y-4 max-h-[500px] overflow-y-auto pr-2">
+                        <p class="text-xs text-slate-300 italic">Waiting for reports...</p>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
+        import { getDatabase, ref, onValue, set, remove, push, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-database.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyAm4QtyA82HBJ-VwBgIlzRHmDgzxxhryNY",
+            databaseURL: "https://rubbishrouter-688b2-default-rtdb.firebaseio.com/",
+            projectId: "rubbishrouter-688b2",
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+
+        // --- ACCESS CONTROL ---
+        window.checkPass = () => {
+            const pass = document.getElementById('admin-pass').value;
+            if(pass === "POTCH2026") {
+                document.getElementById('login-screen').classList.add('hidden');
+                document.getElementById('admin-content').style.display = 'block';
+                loadAllData();
+            } else { alert("Unauthorized Access"); }
+        };
+
+        function loadAllData() {
+            const today = new Date().toISOString().split('T')[0];
+
+            // 1. PENDING ADS LIST
+            onValue(ref(db, 'pending_ads'), (snap) => {
+                const list = document.getElementById('pending-ads-list');
+                list.innerHTML = "";
+                if(!snap.exists()) { list.innerHTML = "<p class='py-10'>No pending ads.</p>"; return; }
+                
+                Object.keys(snap.val()).forEach(id => {
+                    const ad = snap.val()[id];
+                    list.innerHTML += `
+                        <div class="p-4 bg-slate-50 rounded-2xl border border-slate-100 text-left">
+                            <div class="flex justify-between mb-1"><span class="text-[9px] font-black bg-yellow-100 text-yellow-700 px-2 rounded uppercase">${ad.type}</span></div>
+                            <h3 class="font-bold text-slate-800 text-sm">${ad.name}</h3>
+                            <p class="text-xs text-slate-500 mb-4 italic">"${ad.text}"</p>
+                            <div class="flex gap-2">
+                                <button onclick="approveAd('${id}')" class="flex-1 bg-slate-800 text-white text-[10px] font-black py-2.5 rounded-xl uppercase tracking-widest">Approve</button>
+                                <button onclick="deleteData('pending_ads/${id}')" class="px-3 bg-red-50 text-red-500 text-xs font-bold rounded-xl">×</button>
+                            </div>
+                        </div>`;
+                });
+            });
+
+            // 2. LIVE FEED & TOWN BREAKDOWN
+            onValue(ref(db, `routes`), (snap) => {
+                const logList = document.getElementById('activity-logs');
+                const activityList = document.getElementById('town-activity-list');
+                
+                logList.innerHTML = "";
+                activityList.innerHTML = "";
+                
+                if(!snap.exists()) { 
+                    logList.innerHTML = "<p class='text-xs italic'>No activity found.</p>"; 
+                    activityList.innerHTML = "<p class='text-xs italic'>No active towns.</p>";
+                    return; 
+                }
+
+                const allTowns = snap.val();
+                let foundToday = false;
+
+                Object.keys(allTowns).forEach(town => {
+                    const townData = allTowns[town][today];
+                    if(townData) {
+                        foundToday = true;
+                        const count = Object.keys(townData).length;
+                        
+                        // Update Town Breakdown
+                        activityList.innerHTML += `
+                            <div class="flex justify-between items-center bg-slate-50 p-3 rounded-xl">
+                                <span class="text-xs font-black text-slate-700">${town}</span>
+                                <span class="bg-purple-100 text-purple-700 text-[10px] font-black px-2 py-1 rounded-full">${count} PINGS</span>
+                            </div>`;
+
+                        // Update Live Logs
+                        Object.values(townData).forEach(entry => {
+                            const time = new Date(entry.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                            logList.innerHTML = `
+                                <div class="flex justify-between items-center p-3 border-b border-slate-50">
+                                    <span class="text-xs font-bold text-slate-700">${time}</span>
+                                    <span class="text-[10px] text-slate-400 font-bold uppercase">${town}</span>
+                                    <span class="text-[10px] text-green-500 font-black">LOGGED</span>
+                                </div>` + logList.innerHTML;
+                        });
+                    }
+                });
+                
+                if(!foundToday) {
+                    logList.innerHTML = "<p class='text-xs italic text-center py-10'>No reports yet today.</p>";
+                    activityList.innerHTML = "<p class='text-xs italic text-center py-10 text-slate-400 uppercase tracking-widest font-bold'>Dormant</p>";
+                }
+            });
+
+            // 4. ACTIVE ADS LIST (with type toggle)
+            onValue(ref(db, 'active_ads'), (snap) => {
+                const list = document.getElementById('active-ads-list');
+                list.innerHTML = "";
+                if (!snap.exists()) { list.innerHTML = "<p class='py-10 text-xs italic'>No active ads.</p>"; return; }
+                Object.entries(snap.val()).forEach(([id, ad]) => {
+                    const isMonthly = ad.type === 'monthly';
+                    const badgeColor = isMonthly ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700';
+                    const badgeLabel = isMonthly ? '⭐ Monthly' : '🔄 Weekly';
+                    const toggleLabel = isMonthly ? 'Downgrade to Weekly' : 'Promote to Monthly';
+                    list.innerHTML += `
+                        <div class="p-4 bg-slate-50 rounded-2xl border border-slate-100 text-left">
+                            <div class="flex justify-between items-center mb-1">
+                                <span class="text-[9px] font-black ${badgeColor} px-2 py-0.5 rounded uppercase">${badgeLabel}</span>
+                                <span class="text-[9px] text-green-500 font-black">● LIVE</span>
+                            </div>
+                            <h3 class="font-bold text-slate-800 text-sm">${ad.name}</h3>
+                            <p class="text-xs text-slate-500 mb-3 italic">"${ad.text}"</p>
+                            <div class="flex gap-2">
+                                <button onclick="toggleAdType('${id}', '${ad.type}')" class="flex-1 bg-slate-700 text-white text-[9px] font-black py-2 rounded-xl uppercase tracking-widest">${toggleLabel}</button>
+                                <button onclick="deleteData('active_ads/${id}')" class="px-3 bg-red-50 text-red-500 text-xs font-bold rounded-xl">×</button>
+                            </div>
+                        </div>`;
+                });
+            });
+            onValue(ref(db, 'registry/towns'), (snap) => {
+                const list = document.getElementById('town-list');
+                list.innerHTML = "";
+                if(snap.exists()) {
+                    Object.keys(snap.val()).forEach(t => {
+                        list.innerHTML += `
+                            <div class="flex justify-between items-center p-3 bg-slate-50 rounded-xl">
+                                <span class="text-xs font-bold text-slate-700">${t}</span>
+                                <button onclick="deleteData('registry/towns/${t}')" class="text-slate-300 hover:text-red-500">×</button>
+                            </div>`;
+                    });
+                }
+            });
+        }
+
+        // --- ACTIONS ---
+        window.simulateRoute = async () => {
+            const today = new Date().toISOString().split('T')[0];
+            const routeRef = ref(db, `routes/Potchefstroom/${today}`);
+            for(let i=0; i<3; i++) {
+                await push(routeRef, { timestamp: Date.now() - (i * 300000), v: 1.0 });
+            }
+            alert("✅ Simulated 3 dots for Potchefstroom.");
+        };
+
+        window.approveAd = (id) => {
+            onValue(ref(db, `pending_ads/${id}`), async (snap) => {
+                const data = snap.val();
+                if(data) {
+                    await set(ref(db, `active_ads/${id}`), { ...data, status: 'active' });
+                    await remove(ref(db, `pending_ads/${id}`));
+                    alert("Ad is now LIVE!");
+                }
+            }, { onlyOnce: true });
+        };
+
+        window.toggleAdType = async (id, currentType) => {
+            const newType = currentType === 'monthly' ? 'weekly' : 'monthly';
+            const snap = await new Promise(res => onValue(ref(db, `active_ads/${id}`), res, { onlyOnce: true }));
+            if (snap.exists()) {
+                await set(ref(db, `active_ads/${id}`), { ...snap.val(), type: newType });
+                alert(`Ad updated to ${newType.toUpperCase()}.`);
+            }
+        };
+
+        window.addNewTown = () => {
+            const name = document.getElementById('new-town').value.trim();
+            if(name) { set(ref(db, `registry/towns/${name}`), { active: true }); document.getElementById('new-town').value = ""; }
+        };
+
+        window.deleteData = (path) => { if(confirm("Permanently delete?")) remove(ref(db, path)); };
+        window.clearLogs = () => { if(confirm("Wipe today's map logs?")) remove(ref(db, `routes`)); };
+    </script>
+</body>
+</html>

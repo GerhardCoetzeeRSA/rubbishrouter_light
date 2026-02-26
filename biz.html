@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Business Portal | RubbishRouter</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Segoe UI', sans-serif; background: #f4f7f6; color: #333; }
+        .header { background: #2c3e50; color: white; padding: 40px 20px; text-align: center; }
+        .header h1 { font-size: 26px; font-weight: 900; }
+        .header p  { font-size: 13px; opacity: 0.75; margin-top: 6px; }
+        .container { max-width: 520px; margin: -30px auto 50px; padding: 0 16px; }
+        .card { background: white; padding: 24px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        .card h3 { font-size: 12px; font-weight: 900; color: #7f8c8d; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 16px; }
+        .plan-select { border: 2px solid #e2e8f0; padding: 16px; border-radius: 14px; margin-bottom: 12px; cursor: pointer; transition: 0.2s; }
+        .plan-select:hover  { border-color: #27ae60; }
+        .plan-select.active { border-color: #27ae60; background: #f0faf5; }
+        .plan-select strong { font-size: 15px; font-weight: 900; color: #2c3e50; }
+        .plan-select span   { font-size: 13px; color: #7f8c8d; margin-left: 6px; }
+        label { display: block; font-size: 12px; font-weight: 700; color: #7f8c8d; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 5px; }
+        input { width: 100%; padding: 12px; margin-bottom: 16px; border: 1.5px solid #e2e8f0; border-radius: 10px; font-size: 14px; font-family: inherit; outline: none; }
+        input:focus { border-color: #27ae60; }
+        .btn-proceed { background: #27ae60; color: white; border: none; width: 100%; padding: 18px; border-radius: 12px; font-weight: 900; font-size: 16px; cursor: pointer; box-shadow: 0 6px 20px rgba(39,174,96,0.35); display: flex; align-items: center; justify-content: center; gap: 10px; }
+        .spinner { display: none; width: 20px; height: 20px; border: 3px solid rgba(255,255,255,0.35); border-top-color: white; border-radius: 50%; animation: spin 0.7s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        #status-box { display: none; padding: 14px; border-radius: 12px; margin-top: 12px; font-size: 13px; font-weight: 700; }
+        #status-box.info  { background: #f0faf5; color: #27ae60; border: 1px solid #86efac; }
+        #status-box.error { background: #fef2f2; color: #e74c3c; border: 1px solid #fca5a5; }
+        .secure-note { font-size: 11px; color: #bdc3c7; text-align: center; margin-top: 16px; line-height: 1.7; }
+    </style>
+</head>
+<body>
+<div class="header">
+    <h1>Partner with RubbishRouter</h1>
+    <p>Get your business seen by residents checking for the truck.</p>
+</div>
+<div class="container">
+    <div class="card">
+        <h3>1. Select a Plan</h3>
+        <div class="plan-select active" id="plan-weekly" onclick="selectPlan(70, 'weekly')">
+            <strong>Weekly Spotlight</strong><span>— R70 / 7 Days</span>
+        </div>
+        <div class="plan-select" id="plan-monthly" onclick="selectPlan(450, 'monthly')">
+            <strong>Monthly Partnership</strong><span>— R450 / 30 Days</span>
+        </div>
+
+        <h3 style="margin-top:20px;">2. Ad Details</h3>
+        <label>Business Name</label>
+        <input type="text" id="biz-name" placeholder="e.g. Potch Coffee Hub">
+        <label>Ad Message (max 60 chars)</label>
+        <input type="text" id="biz-text" placeholder="Best burgers in town! 10% off for residents." maxlength="60">
+        <label>Logo / Image URL</label>
+        <input type="url" id="biz-logo" placeholder="https://yoursite.com/logo.png">
+        <label>Click-through Link (WhatsApp or website)</label>
+        <input type="url" id="biz-url" placeholder="https://wa.me/27...">
+
+        <button class="btn-proceed" id="pay-btn" onclick="proceedToPayment()">
+            <div class="spinner" id="spinner"></div>
+            <span id="btn-label">PROCEED TO PAYMENT →</span>
+        </button>
+        <div id="status-box"></div>
+        <div class="secure-note">🔒 Secure payment via <strong>Zapper</strong><br>Coetzee Data AI Consultants (Pty) Ltd</div>
+    </div>
+</div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
+    import { getDatabase, ref, set } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-database.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyAm4QtyA82HBJ-VwBgIlzRHmDgzxxhryNY",
+        databaseURL: "https://rubbishrouter-688b2-default-rtdb.firebaseio.com/",
+        projectId: "rubbishrouter-688b2",
+    };
+    const app = initializeApp(firebaseConfig);
+    const db  = getDatabase(app);
+
+    const CLOUD_FN = "https://us-central1-rubbishrouter-688b2.cloudfunctions.net/createZapperInvoice";
+
+    let currentAmount = 70;
+    let currentType   = 'weekly';
+
+    window.selectPlan = (amt, type) => {
+        currentAmount = amt;
+        currentType   = type;
+        document.querySelectorAll('.plan-select').forEach(el => el.classList.remove('active'));
+        document.getElementById(`plan-${type}`).classList.add('active');
+    };
+
+    function setLoading(on) {
+        document.getElementById('pay-btn').disabled          = on;
+        document.getElementById('spinner').style.display     = on ? 'block' : 'none';
+        document.getElementById('btn-label').textContent     = on ? 'Opening Zapper...' : 'PROCEED TO PAYMENT →';
+    }
+    function setStatus(msg, type) {
+        const el = document.getElementById('status-box');
+        el.textContent   = msg;
+        el.className     = type;
+        el.style.display = msg ? 'block' : 'none';
+    }
+
+    window.proceedToPayment = async () => {
+        const data = {
+            name:   document.getElementById('biz-name').value.trim(),
+            text:   document.getElementById('biz-text').value.trim(),
+            logo:   document.getElementById('biz-logo').value.trim(),
+            url:    document.getElementById('biz-url').value.trim(),
+            amount: currentAmount,
+            type:   currentType,
+            status: 'pending_payment',
+        };
+        if (!data.name || !data.text || !data.logo) {
+            alert("Please fill in Business Name, Ad Message, and Logo URL.");
+            return;
+        }
+
+        setLoading(true);
+        setStatus('', '');
+
+        // Save to Firebase first
+        const refID = `BIZ-${Date.now()}`;
+        await set(ref(db, `pending_ads/${refID}`), data);
+
+        // Call Cloud Function to get Zapper deep link
+        try {
+            const res = await fetch(CLOUD_FN, {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify({
+                    amountCents: currentAmount * 100,
+                    reference:   refID,
+                    siteId:      96037,   // override to biz site ID
+                })
+            });
+            if (!res.ok) throw new Error('fn_error');
+            const { appLink } = await res.json();
+            if (!appLink) throw new Error('no_link');
+            setStatus('Redirecting to Zapper...', 'info');
+            setTimeout(() => window.location.href = appLink, 400);
+        } catch(e) {
+            setLoading(false);
+            setStatus(`Ad saved! Please open Zapper and pay R${currentAmount} to: Coetzee Data AI Consultants (ref: ${refID})`, 'error');
+        }
+    };
+</script>
+</body>
+</html>

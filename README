@@ -1,0 +1,16 @@
+RubbishRouter Light
+Scalable Community-Powered Waste Tracking
+
+RubbishRouter Light is a "Waze-style" crowdsourcing platform for municipal waste management. It allows residents to track the progress of waste collection vehicles without the need for municipal GPS hardware.
+
+✨ Key Features
+Multi-Muni Identity: Scoped data for any municipality via URL parameters (?muni=Name).
+
+Crowdsourced Breadcrumbs: Live map updates when neighbors report their bins are emptied.
+
+Gamified Rewards: Monthly Star Ranking (Silver to Gold) for active contributors.
+
+Business Ready: Integrated R70/week advertising slots and R15/month resident subscriptions.
+
+🚀 Commercial Model
+This app is designed for private operation. Income from subscriptions and advertising is managed directly through the integrated PayFast portal.

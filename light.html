@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>RubbishRouter | Live Map</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <!-- Leaflet -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        // Init Leaflet BEFORE the module script runs.
+        // Must be a regular (non-module) script so L is available globally.
+        // We defer actual map creation until DOMContentLoaded so the
+        // #map-canvas div has its CSS height applied.
+        let leafletMap, mapMarkers = [];
+        document.addEventListener('DOMContentLoaded', () => {
+            leafletMap = L.map('map-canvas', {
+                center:      [-26.7145, 27.0966], // default: Potchefstroom
+                zoom:        14,
+                zoomControl: true,
+                attributionControl: false,
+            });
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+            }).addTo(leafletMap);
+            L.control.attribution({ position: 'bottomright', prefix: '' })
+                .addAttribution('© <a href="https://openstreetmap.org">OSM</a>')
+                .addTo(leafletMap);
+            // Force Leaflet to recalculate size after CSS layout settles
+            setTimeout(() => leafletMap.invalidateSize(), 300);
+        });
+    </script>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: #f4f7f6; color: #2c3e50; min-height: 100vh; }
+
+        /* ── HERO ── */
+        .hero { background: #27ae60; color: white; padding: 20px 20px 50px; text-align: center; }
+        .hero h1 { font-size: 26px; font-weight: 900; letter-spacing: -0.5px; }
+        .hero .muni { font-size: 12px; opacity: 0.85; text-transform: uppercase; letter-spacing: 2px; margin-top: 4px; }
+        .hero-wrap { position: relative; }
+        .hero a { position: absolute; top: 20px; left: 16px; font-size: 12px; color: rgba(255,255,255,0.85); text-decoration: none; font-weight: 700; }
+
+        /* ── WRAP & CARDS ── */
+        .wrap { max-width: 480px; margin: -30px auto 0; padding: 0 16px 32px; }
+        .card { background: white; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); padding: 20px; margin-bottom: 16px; }
+
+        /* ── EVAL CARD ── */
+        .eval-card { background: #2c3e50; color: white; display: flex; align-items: center; gap: 14px; position: relative; overflow: hidden; }
+        #trial-tag { position: absolute; top: 0; right: 0; background: #3b82f6; color: white; font-size: 9px; font-weight: 900; padding: 5px 12px; border-bottom-left-radius: 10px; text-transform: uppercase; letter-spacing: 1px; }
+        #trial-tag.expired { background: #e74c3c; }
+        #trial-tag.pro { background: #27ae60; }
+        .star { font-size: 38px; line-height: 1; }
+        .star.grey  { color: #64748b; }
+        .star.green { color: #27ae60; }
+        .star.gold  { color: #f1c40f; }
+        .eval-mid { flex: 1; }
+        .eval-mid .lbl { font-size: 9px; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 4px; }
+        #status-label { font-size: 18px; font-weight: 900; font-style: italic; }
+        .eval-right { text-align: right; padding-top: 8px; }
+        #ping-count { font-size: 28px; font-weight: 900; color: white; }
+        .eval-right .lbl { font-size: 9px; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; }
+
+        /* ── ETA CARD ── */
+        .eta-card { text-align: center; }
+        .eta-lbl { font-size: 10px; font-weight: 800; color: #7f8c8d; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 8px; }
+        #eta-display { font-size: 34px; font-weight: 900; font-style: italic; color: #27ae60; margin-bottom: 4px; }
+        #last-ping-time { font-size: 11px; color: #95a5a6; }
+        /* Route learning — "usually arrives around X" */
+        #usual-time { font-size: 11px; color: #27ae60; margin-top: 4px; font-weight: 700; }
+
+        /* ── MAP (Leaflet) ── */
+        #map-canvas {
+            border-radius: 20px; width: 100%; height: 320px;
+            margin-bottom: 16px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+            overflow: hidden; position: relative;
+        }
+        #map-canvas .leaflet-container { border-radius: 20px; }
+        #no-reports-msg {
+            display: none; position: absolute; bottom: 12px; left: 50%;
+            transform: translateX(-50%); z-index: 1000;
+            background: rgba(44,62,80,0.82); color: white;
+            font-size: 12px; font-weight: 700; font-style: italic;
+            padding: 8px 16px; border-radius: 20px;
+            white-space: nowrap; pointer-events: none;
+        }
+        /* Pulsing green truck marker */
+        .truck-marker {
+            width: 22px; height: 22px;
+            background: #27ae60; border-radius: 50%;
+            border: 3px solid white;
+            box-shadow: 0 0 0 4px rgba(39,174,96,0.35), 0 0 16px rgba(39,174,96,0.6);
+            animation: truckPing 2s infinite;
+        }
+        @keyframes truckPing {
+            0%,100% { box-shadow: 0 0 0 4px rgba(39,174,96,0.35), 0 0 16px rgba(39,174,96,0.6); }
+            50%      { box-shadow: 0 0 0 10px rgba(39,174,96,0.1), 0 0 28px rgba(39,174,96,0.4); }
+        }
+        /* Older faded dot markers */
+        .old-marker {
+            width: 12px; height: 12px;
+            background: #27ae60; border-radius: 50%;
+            border: 2px solid white; opacity: 0.45;
+        }
+
+        /* ── LEAFLET POPUP STYLE ── */
+        .rr-popup .leaflet-popup-content-wrapper {
+            background: #2c3e50; color: white; border-radius: 10px;
+            font-family: 'Segoe UI', system-ui, sans-serif; font-size: 12px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+        }
+        .rr-popup .leaflet-popup-tip { background: #2c3e50; }
+        .rr-popup .leaflet-popup-content { margin: 8px 12px; line-height: 1.5; }
+
+        /* ── LOG BUTTON ── */
+        #log-btn { width: 100%; background: #27ae60; color: white; border: none; border-radius: 12px; padding: 20px; font-size: 17px; font-weight: 900; cursor: pointer; margin-bottom: 16px; box-shadow: 0 6px 20px rgba(39,174,96,0.4); transition: transform 0.1s, opacity 0.15s; }
+        #log-btn:hover { opacity: 0.92; }
+        #log-btn:active { transform: scale(0.97); }
+        #log-btn:disabled { opacity: 0.6; }
+
+        /* ── STREET INPUT (shown after log btn tap) ── */
+        #street-input-wrap { display: none; margin-bottom: 16px; }
+        #street-input-wrap .inner { background: white; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); padding: 16px; display: flex; gap: 10px; align-items: center; }
+        #street-name { flex: 1; border: 1.5px solid #e2e8f0; border-radius: 10px; padding: 12px; font-size: 14px; font-family: inherit; outline: none; color: #2c3e50; }
+        #street-name:focus { border-color: #27ae60; }
+        #street-submit { background: #27ae60; color: white; border: none; border-radius: 10px; padding: 12px 18px; font-weight: 900; font-size: 13px; cursor: pointer; white-space: nowrap; }
+        #street-skip { display: block; text-align: center; font-size: 12px; color: #95a5a6; margin-top: 8px; cursor: pointer; background: none; border: none; width: 100%; }
+
+        /* ── WHATSAPP SHARE ── */
+        #share-btn { width: 100%; background: #25D366; color: white; border: none; border-radius: 12px; padding: 16px; font-size: 15px; font-weight: 900; cursor: pointer; margin-bottom: 16px; display: flex; align-items: center; justify-content: center; gap: 10px; box-shadow: 0 6px 20px rgba(37,211,102,0.35); transition: transform 0.1s, opacity 0.15s; }
+        #share-btn:hover { opacity: 0.92; }
+        #share-btn:active { transform: scale(0.97); }
+
+        /* ── SECTION LABEL ── */
+        .section-lbl { font-size: 10px; font-weight: 800; color: #7f8c8d; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 10px; }
+
+        /* ── FEED ── */
+        .feed-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+        #today-count { background: #e8f8f0; color: #27ae60; font-size: 10px; font-weight: 900; padding: 3px 10px; border-radius: 20px; }
+        .feed-item { display: flex; justify-content: space-between; align-items: center; padding: 9px 0; border-bottom: 1px solid #f0f4f3; font-size: 13px; color: #2c3e50; }
+        .feed-item:last-child { border-bottom: none; }
+        .feed-item .left { display: flex; flex-direction: column; gap: 2px; }
+        .feed-item .street-tag { font-size: 10px; font-weight: 700; color: #27ae60; }
+        .feed-item .t { font-size: 11px; color: #95a5a6; font-weight: 700; }
+        #feed-empty { font-size: 12px; font-style: italic; color: #95a5a6; text-align: center; padding: 14px 0; }
+
+        /* ── PUSH NOTIFICATION BANNER ── */
+        #notif-banner { display: none; background: #fff3cd; border: 1.5px solid #f1c40f; border-radius: 14px; padding: 14px 16px; margin-bottom: 16px; }
+        #notif-banner p { font-size: 13px; color: #2c3e50; margin-bottom: 10px; }
+        #notif-btn { background: #2c3e50; color: white; border: none; border-radius: 8px; padding: 10px 18px; font-size: 13px; font-weight: 900; cursor: pointer; }
+
+        /* ── PUSH ALERT POPUP ── */
+        #push-alert { display: none; position: fixed; top: 16px; left: 50%; transform: translateX(-50%); background: #2c3e50; color: white; padding: 14px 20px; border-radius: 14px; z-index: 500; box-shadow: 0 10px 30px rgba(0,0,0,0.25); max-width: 340px; width: 90%; }
+        #push-alert .pa-title { font-size: 13px; font-weight: 900; margin-bottom: 4px; }
+        #push-alert .pa-body  { font-size: 12px; color: #94a3b8; }
+
+        /* ── AD BANNER ── */
+        /* ── MONTHLY PARTNER BANNER (always visible, prominent) ── */
+        #monthly-banner { display: none; background: white; border: 2px solid #27ae60; border-radius: 16px; padding: 16px; margin-bottom: 16px; cursor: pointer; position: relative; overflow: hidden; }
+        #monthly-banner::before { content: ''; position: absolute; top: 0; left: 0; width: 4px; height: 100%; background: #27ae60; }
+        .monthly-inner { display: flex; gap: 14px; align-items: center; padding-left: 8px; }
+        #monthly-logo { width: 52px; height: 52px; border-radius: 12px; object-fit: cover; flex-shrink: 0; border: 1px solid #e2e8f0; }
+        .monthly-badge { font-size: 8px; font-weight: 900; color: white; background: #27ae60; padding: 3px 8px; border-radius: 20px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; display: inline-block; }
+        #monthly-name { font-size: 15px; font-weight: 900; color: #2c3e50; margin-bottom: 2px; }
+        #monthly-text { font-size: 12px; color: #7f8c8d; }
+
+        /* ── WEEKLY ROTATING AD (smaller, subtle) ── */
+        #ad-banner { display: none; background: #f9fffe; border: 1.5px dashed #b2dfdb; border-radius: 14px; padding: 12px; margin-bottom: 16px; cursor: pointer; }
+        .ad-inner { display: flex; gap: 12px; align-items: center; }
+        #ad-logo { width: 40px; height: 40px; border-radius: 8px; object-fit: cover; flex-shrink: 0; }
+        .ad-tag { font-size: 9px; font-weight: 900; color: #7f8c8d; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 2px; }
+        #ad-name { font-size: 13px; font-weight: 900; color: #2c3e50; }
+        #ad-text { font-size: 11px; color: #7f8c8d; }
+
+        /* ── FOOTER ── */
+        .foot { text-align: center; padding: 4px 0 24px; }
+        .foot a { font-size: 12px; color: #95a5a6; text-decoration: none; margin: 0 8px; }
+        .foot a:hover { color: #2c3e50; }
+        .foot .reset-link { color: #e74c3c; font-size: 11px; }
+
+        /* ── GATE OVERLAY ── */
+        #subscription-gate { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.65); z-index: 200; align-items: center; justify-content: center; padding: 20px; }
+        .gate-box { background: white; border-radius: 24px; padding: 36px 28px; max-width: 360px; width: 100%; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,0.25); }
+        .gate-icon { font-size: 52px; margin-bottom: 14px; }
+        .gate-box h2 { font-size: 22px; font-weight: 900; color: #2c3e50; margin-bottom: 10px; }
+        .gate-box p  { font-size: 14px; color: #7f8c8d; line-height: 1.6; margin-bottom: 24px; }
+        #gate-button { width: 100%; padding: 18px; background: #27ae60; color: white; border: none; border-radius: 12px; font-size: 16px; font-weight: 900; cursor: pointer; box-shadow: 0 6px 20px rgba(39,174,96,0.4); }
+        #gate-button.pay { background: #2c3e50; }
+        .gate-box small { display: block; font-size: 11px; color: #95a5a6; margin-top: 12px; }
+
+        /* ── TOAST ── */
+        #toast { display: none; position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%); background: #2c3e50; color: white; padding: 12px 24px; border-radius: 12px; font-weight: 700; font-size: 13px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); z-index: 400; white-space: nowrap; }
+    </style>
+</head>
+<body>
+
+<div id="toast"></div>
+
+<!-- PUSH ALERT (simulated notification popup) -->
+<div id="push-alert">
+    <div class="pa-title">🚛 Truck Alert — <span id="pa-muni"></span></div>
+    <div class="pa-body" id="pa-body">A neighbor just logged the truck near your area!</div>
+</div>
+
+<!-- SUBSCRIPTION GATE -->
+<div id="subscription-gate">
+    <div class="gate-box">
+        <div class="gate-icon">🗑️</div>
+        <h2 id="gate-title">Welcome to RubbishRouter</h2>
+        <p id="gate-desc">The community-powered map that tells you when the garbage truck is near your street. Start your <strong>14-day free trial</strong> — no card needed.</p>
+        <button id="gate-button" onclick="startTrial()">🚀 START FREE TRIAL</button>
+        <small>Then just R15/month to keep tracking.</small>
+    </div>
+</div>
+
+<!-- PAYMENT: handled by pay.html -->
+
+<!-- HERO -->
+<div class="hero-wrap">
+    <div class="hero">
+        <a href="index.html">← Towns</a>
+        <h1>RubbishRouter</h1>
+        <div class="muni" id="muni-label">Loading...</div>
+    </div>
+</div>
+
+<div class="wrap">
+
+    <!-- EVAL CARD -->
+    <div class="card eval-card">
+        <div id="trial-tag">Trial: <span id="days-left">14</span> Days Left</div>
+        <div id="star-icon" class="star grey">★</div>
+        <div class="eval-mid">
+            <div class="lbl">Resident Status</div>
+            <div id="status-label">Newcomer</div>
+        </div>
+        <div class="eval-right">
+            <div id="ping-count">0</div>
+            <div class="lbl">My Pings</div>
+        </div>
+    </div>
+
+    <!-- ETA CARD -->
+    <div class="card eta-card">
+        <div class="eta-lbl">Estimated Truck Arrival</div>
+        <div id="eta-display">Calculating...</div>
+        <div id="last-ping-time">No recent reports</div>
+        <div id="usual-time"></div>
+    </div>
+
+    <!-- MAP (Leaflet) -->
+    <div id="map-canvas">
+        <div id="no-reports-msg">No reports yet today</div>
+    </div>
+
+    <!-- LOG BUTTON -->
+    <button id="log-btn" onclick="showStreetInput()">✅ LOG MY BIN — Truck Just Passed!</button>
+
+    <!-- STREET INPUT (appears after tapping log) -->
+    <div id="street-input-wrap">
+        <div class="inner">
+            <input type="text" id="street-name" placeholder="Your street name (e.g. Oak Street)" maxlength="40">
+            <button id="street-submit" onclick="submitLog()">LOG IT</button>
+        </div>
+        <button id="street-skip" onclick="submitLog()">Skip — log without street name</button>
+    </div>
+
+    <!-- WHATSAPP SHARE -->
+    <button id="share-btn" onclick="shareWhatsApp()">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+        SHARE ON WHATSAPP
+    </button>
+
+    <!-- PUSH NOTIFICATION INVITE -->
+    <div id="notif-banner">
+        <p>🔔 <strong>Get notified when the truck is nearby</strong> — even when the app is closed.</p>
+        <button id="notif-btn" onclick="requestPushPermission()">Enable Alerts</button>
+    </div>
+
+    <!-- COMMUNITY FEED -->
+    <div class="card">
+        <div class="feed-header">
+            <div class="section-lbl">Community Feed</div>
+            <div id="today-count">0 today</div>
+        </div>
+        <div id="feed-list">
+            <div id="feed-empty">Waiting for neighbor reports...</div>
+        </div>
+    </div>
+
+    <!-- MONTHLY PARTNER BANNER (prominent, always shown if active) -->
+    <div id="monthly-banner">
+        <div class="monthly-inner">
+            <img id="monthly-logo" src="" alt="" onerror="this.style.display='none'">
+            <div>
+                <span class="monthly-badge">⭐ Monthly Partner</span>
+                <div id="monthly-name"></div>
+                <div id="monthly-text"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- WEEKLY ROTATING AD (smaller, below partner) -->
+    <div id="ad-banner">
+        <div class="ad-inner">
+            <img id="ad-logo" src="" alt="" onerror="this.style.display='none'">
+            <div>
+                <div class="ad-tag">📢 Local Business</div>
+                <div id="ad-name"></div>
+                <div id="ad-text"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- FOOTER -->
+    <div class="foot">
+        <a href="how-it-works.html">How It Works</a>
+        <a href="biz.html">Advertise</a>
+        <a href="legal.html">Legal</a>
+        <br><br>
+        <a href="#" class="reset-link" onclick="resetApp();return false;">Reset App / Clear Data</a>
+    </div>
+
+</div>
+
+<script type="module">
+    import { initializeApp }    from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
+    import { getDatabase, ref, onValue, push, get } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-database.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyAm4QtyA82HBJ-VwBgIlzRHmDgzxxhryNY",
+        databaseURL: "https://rubbishrouter-688b2-default-rtdb.firebaseio.com/",
+        projectId: "rubbishrouter-688b2",
+    };
+    const app = initializeApp(firebaseConfig);
+    const db  = getDatabase(app);
+
+    const ZAPPER_MERCHANT_ID = "76032";
+    const ZAPPER_SITE_ID     = "96013";
+    console.log("RubbishRouter v5.0 loaded");
+
+    // ─── MUNICIPALITY ─────────────────────────────────────────
+    const urlParams = new URLSearchParams(window.location.search);
+    const muni = urlParams.get('muni') || 'Potchefstroom';
+    document.getElementById('muni-label').textContent = muni;
+    document.getElementById('pa-muni').textContent    = muni;
+    document.title = `RubbishRouter | ${muni}`;
+    localStorage.setItem('rr_last_muni', muni); // so pay.html can return here
+
+    // ─── TOWN COORDINATES ─────────────────────────────────────
+    const TOWN_COORDS = {
+        'Potchefstroom':   [-26.7145, 27.0966],
+        'Klerksdorp':      [-26.8516, 26.6680],
+        'Rustenburg':      [-25.6674, 27.2420],
+        'Mahikeng':        [-25.8553, 25.6459],
+        'Lichtenburg':     [-26.1478, 26.1637],
+        'Vryburg':         [-26.9569, 24.7280],
+        'Brits':           [-25.6321, 27.7784],
+        'Hartswater':      [-27.7333, 24.8167],
+        'Wolmaransstad':   [-27.1929, 25.9711],
+        'Delareyville':    [-26.6833, 25.4333],
+        'Johannesburg':    [-26.2041, 28.0473],
+        'Cape Town':       [-33.9249, 18.4241],
+        'Pretoria':        [-25.7479, 28.2293],
+        'Durban':          [-29.8587, 31.0218],
+        'Bloemfontein':    [-29.0852, 26.1596],
+    };
+    const defaultCoords = TOWN_COORDS[muni] || [-26.7145, 27.0966];
+
+    // Centre map on correct town once Leaflet is ready
+    // (leafletMap is initialised in the inline script in <head>)
+    const centreMap = () => {
+        if (!leafletMap) return;
+        leafletMap.setView(defaultCoords, 14);
+        leafletMap.invalidateSize();
+    };
+    if (document.readyState === 'complete') {
+        setTimeout(centreMap, 100);
+    } else {
+        window.addEventListener('load', () => setTimeout(centreMap, 100));
+    }
+
+    // Geocode unknown towns via Nominatim
+    if (!TOWN_COORDS[muni]) {
+        fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(muni + ', South Africa')}&format=json&limit=1`)
+            .then(r => r.json())
+            .then(data => {
+                if (data && data[0] && leafletMap) {
+                    leafletMap.setView([parseFloat(data[0].lat), parseFloat(data[0].lon)], 14);
+                }
+            }).catch(() => {});
+    }
+
+    const today    = new Date().toISOString().split('T')[0];
+    const routeRef = ref(db, `routes/${muni}/${today}`);
+
+    // ─── UTILS ────────────────────────────────────────────────
+    function showToast(msg) {
+        const el = document.getElementById('toast');
+        el.textContent = msg; el.style.display = 'block';
+        clearTimeout(el._t);
+        el._t = setTimeout(() => el.style.display = 'none', 3000);
+    }
+    window.resetApp = () => {
+        if (confirm("Clear your local data and restart?")) { localStorage.clear(); window.location.href = "index.html"; }
+    };
+
+    // ─── PAYMENT ──────────────────────────────────────────────
+    // Redirect to the dedicated pay.html page which handles the
+    // full Zapper API integration (Cloud Function + fallback).
+    function openPayModal() {
+        window.location.href = 'pay.html';
+    }
+    window.closePayModal = () => document.getElementById('pay-modal').style.display = 'none';
+
+    // ─── TRIAL DISPLAY ────────────────────────────────────────
+    function updateTrialDisplay() {
+        const status     = localStorage.getItem('rr_user_status');
+        const trialStart = parseInt(localStorage.getItem('rr_trial_start') || '0');
+        const tag = document.getElementById('trial-tag');
+        if (status === 'active') { tag.textContent = '✓ PRO MEMBER'; tag.className = 'pro'; tag.style.display = 'block'; return; }
+        if (status === 'trial' && trialStart) {
+            const daysLeft = Math.max(0, Math.ceil((14 * 86400000 - (Date.now() - trialStart)) / 86400000));
+            document.getElementById('days-left').textContent = daysLeft;
+            tag.className     = daysLeft <= 2 ? 'expired' : '';
+            tag.style.display = 'block'; return;
+        }
+        tag.style.display = 'none';
+    }
+
+    // ─── SUBSCRIPTION CHECK ───────────────────────────────────
+    function checkSubscription() {
+        const status     = localStorage.getItem('rr_user_status');
+        const trialStart = parseInt(localStorage.getItem('rr_trial_start') || '0');
+        if (!status) { document.getElementById('subscription-gate').style.display = 'flex'; return; }
+        if (status === 'trial' && Date.now() - trialStart > 14 * 86400000) { lockAppForPayment(); return; }
+        updateTrialDisplay(); loadData(); loadRouteLearning(); showNotifBanner();
+    }
+    window.startTrial = () => {
+        localStorage.setItem('rr_user_status', 'trial');
+        localStorage.setItem('rr_trial_start', Date.now().toString());
+        document.getElementById('subscription-gate').style.display = 'none';
+        updateTrialDisplay(); updateStarUI(); loadData(); loadRouteLearning(); showNotifBanner();
+    };
+    function lockAppForPayment() {
+        document.getElementById('subscription-gate').style.display = 'flex';
+        document.getElementById('gate-title').textContent = 'Trial Expired';
+        document.getElementById('gate-desc').innerHTML = 'To keep tracking live, support the community for <strong>R15/month</strong> via Zapper.';
+        const btn = document.getElementById('gate-button');
+        btn.textContent = 'SUBSCRIBE — R15/month'; btn.className = 'pay';
+        btn.onclick = () => { document.getElementById('subscription-gate').style.display = 'none'; openPayModal(); };
+        updateTrialDisplay();
+    }
+
+    // ─── STAR / RANK ──────────────────────────────────────────
+    function updateStarUI() {
+        const pings = parseInt(localStorage.getItem(`rr_pings_${muni}`) || '0');
+        const starEl = document.getElementById('star-icon');
+        const lblEl  = document.getElementById('status-label');
+        document.getElementById('ping-count').textContent = pings;
+        if      (pings >= 20) { starEl.className = 'star gold';  lblEl.textContent = 'Community Hero'; }
+        else if (pings >= 10) { starEl.className = 'star green'; lblEl.textContent = 'Trusted Contributor'; }
+        else if (pings >= 3)  { starEl.className = 'star green'; lblEl.textContent = 'Active Neighbor'; }
+        else if (pings >= 1)  { starEl.className = 'star green'; lblEl.textContent = 'Contributor'; }
+        else                  { starEl.className = 'star grey';  lblEl.textContent = 'Newcomer'; }
+    }
+
+    // ─── FEATURE 1: STREET-LEVEL LOGGING ─────────────────────
+    let pendingStreet = '';
+    let pendingCoords = null; // {lat, lng} from GPS if available
+
+    window.showStreetInput = () => {
+        document.getElementById('log-btn').style.display = 'none';
+        document.getElementById('street-input-wrap').style.display = 'block';
+        document.getElementById('street-name').focus();
+        // Pre-fetch GPS in background while user types
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                pos => { pendingCoords = { lat: pos.coords.latitude, lng: pos.coords.longitude }; },
+                ()  => { pendingCoords = null; },
+                { timeout: 8000, maximumAge: 30000 }
+            );
+        }
+    };
+
+    window.submitLog = async () => {
+        pendingStreet = document.getElementById('street-name').value.trim();
+        document.getElementById('street-input-wrap').style.display = 'none';
+        document.getElementById('log-btn').style.display = 'block';
+        document.getElementById('log-btn').disabled = true;
+        document.getElementById('log-btn').textContent = 'Logging...';
+        document.getElementById('street-name').value = '';
+        try {
+            const payload = {
+                timestamp: Date.now(),
+                street:    pendingStreet || null,
+                v:         2.0
+            };
+            // If we got GPS coords, save them so the marker is exact
+            if (pendingCoords) {
+                payload.lat = pendingCoords.lat;
+                payload.lng = pendingCoords.lng;
+            }
+            await push(routeRef, payload);
+            const key = `rr_pings_${muni}`;
+            localStorage.setItem(key, (parseInt(localStorage.getItem(key) || '0') + 1).toString());
+            updateStarUI();
+            const msg = pendingStreet
+                ? `✅ Logged for ${pendingStreet}! Neighbors alerted.`
+                : '✅ Logged! Your neighbors have been alerted.';
+            showToast(msg);
+            pendingCoords = null;
+        } catch(e) {
+            showToast('❌ Could not log — check your connection.');
+        } finally {
+            document.getElementById('log-btn').disabled = false;
+            document.getElementById('log-btn').textContent = '✅ LOG MY BIN — Truck Just Passed!';
+        }
+    };
+
+    // ─── FEATURE 2: PUSH NOTIFICATIONS ───────────────────────
+    // Uses the browser Notifications API. When a new log comes in and
+    // the truck is estimated <15 min away, fires a native push alert.
+    // Also shows an in-app banner to prompt permission.
+    function showNotifBanner() {
+        if (!('Notification' in window)) return;
+        if (Notification.permission === 'default') {
+            document.getElementById('notif-banner').style.display = 'block';
+        }
+    }
+    window.requestPushPermission = async () => {
+        if (!('Notification' in window)) { showToast('Notifications not supported on this browser.'); return; }
+        const result = await Notification.requestPermission();
+        document.getElementById('notif-banner').style.display = 'none';
+        if (result === 'granted') {
+            showToast('🔔 Alerts enabled! You\'ll be notified when the truck is near.');
+            localStorage.setItem('rr_notif', 'granted');
+        } else {
+            showToast('Notifications blocked. You can enable them in browser settings.');
+        }
+    };
+    function maybeNotify(minsAway, street) {
+        if (Notification.permission !== 'granted') return;
+        // Only notify if truck is 5–15 min away & we haven't notified recently
+        const lastNotif = parseInt(localStorage.getItem('rr_last_notif') || '0');
+        if (Date.now() - lastNotif < 10 * 60000) return; // max once per 10 min
+        if (minsAway > 0 && minsAway <= 15) {
+            const body = street
+                ? `Just passed ${street} — about ${minsAway} min away. Get your bin out!`
+                : `About ${minsAway} min away. Get your bin out!`;
+            // Show in-app alert popup (works even without service worker)
+            const alert = document.getElementById('push-alert');
+            document.getElementById('pa-body').textContent = body;
+            alert.style.display = 'block';
+            setTimeout(() => alert.style.display = 'none', 6000);
+            // Also fire native notification if app is in background
+            try {
+                new Notification(`🚛 Truck Alert — ${muni}`, { body, icon: '/favicon.ico', tag: 'truck-alert' });
+            } catch(e) {}
+            localStorage.setItem('rr_last_notif', Date.now().toString());
+        }
+    }
+
+    // ─── FEATURE 3: ROUTE LEARNING ───────────────────────────
+    // Reads the last 7 days of route data from Firebase.
+    // Finds the average time of the first ping each day.
+    // Displays "Usually arrives around 09:30" on the ETA card.
+    async function loadRouteLearning() {
+        const usualEl = document.getElementById('usual-time');
+        const avgTimes = [];
+        for (let d = 1; d <= 7; d++) {
+            const date = new Date();
+            date.setDate(date.getDate() - d);
+            const dateStr = date.toISOString().split('T')[0];
+            try {
+                const snap = await get(ref(db, `routes/${muni}/${dateStr}`));
+                if (!snap.exists()) continue;
+                const entries = Object.values(snap.val()).filter(e => e && e.timestamp);
+                if (!entries.length) continue;
+                entries.sort((a, b) => a.timestamp - b.timestamp);
+                // Get time-of-day in minutes from midnight
+                const firstTs = entries[0].timestamp;
+                const d2 = new Date(firstTs);
+                avgTimes.push(d2.getHours() * 60 + d2.getMinutes());
+            } catch(e) {}
+        }
+        if (avgTimes.length >= 2) {
+            const avg = Math.round(avgTimes.reduce((a, b) => a + b, 0) / avgTimes.length);
+            const hh  = String(Math.floor(avg / 60)).padStart(2, '0');
+            const mm  = String(avg % 60).padStart(2, '0');
+            usualEl.textContent = `📅 Usually arrives around ${hh}:${mm} (based on ${avgTimes.length} days)`;
+        } else if (avgTimes.length === 1) {
+            const d2 = new Date();
+            d2.setHours(0, avgTimes[0], 0, 0);
+            const hh = String(Math.floor(avgTimes[0] / 60)).padStart(2, '0');
+            const mm = String(avgTimes[0] % 60).padStart(2, '0');
+            usualEl.textContent = `📅 Last seen around ${hh}:${mm}`;
+        }
+    }
+
+    // ─── FEATURE 4: WHATSAPP SHARE ────────────────────────────
+    // One-tap button that builds a context-aware message:
+    // "🚛 Truck just passed Oak Street in Potchefstroom! ~8 min away..."
+    // and opens WhatsApp share sheet.
+    let lastStreetLogged = '';
+    let lastEtaMins      = null;
+    window.shareWhatsApp = () => {
+        const etaText = lastEtaMins !== null && lastEtaMins > 0
+            ? `~${lastEtaMins} min away from your street`
+            : 'nearby right now';
+        const streetPart = lastStreetLogged ? ` — just passed ${lastStreetLogged}` : '';
+        const msg = `🗑️ *RubbishRouter Alert*\n\nTruck is ${etaText} in *${muni}*${streetPart}.\n\nCheck live tracking 👉 https://gerhardcoetzeersa.github.io/rubbishrouter_light/`;
+        window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
+    };
+
+    // ─── LIVE DATA ────────────────────────────────────────────
+    function loadData() {
+        onValue(routeRef, (snap) => {
+            const feedEl  = document.getElementById('feed-list');
+            const noRep   = document.getElementById('no-reports-msg');
+            const etaEl   = document.getElementById('eta-display');
+            const lastEl  = document.getElementById('last-ping-time');
+            const cntEl   = document.getElementById('today-count');
+            const emptyEl = document.getElementById('feed-empty');
+
+            feedEl.querySelectorAll('.feed-item').forEach(n => n.remove());
+
+            if (!snap.exists()) {
+                noRep.style.display   = 'block';
+                etaEl.textContent     = 'No Reports Yet';
+                etaEl.style.color     = '#95a5a6';
+                lastEl.textContent    = 'Be the first to log the truck today!';
+                cntEl.textContent     = '0 today';
+                emptyEl.style.display = 'block';
+                return;
+            }
+
+            noRep.style.display   = 'none';
+            emptyEl.style.display = 'none';
+
+            const entries = Object.values(snap.val()).filter(e => e && e.timestamp);
+            cntEl.textContent = `${entries.length} today`;
+            entries.sort((a, b) => a.timestamp - b.timestamp);
+
+            // ── Leaflet markers — clear old ones ──────────────────
+            mapMarkers.forEach(m => leafletMap.removeLayer(m));
+            mapMarkers = [];
+
+            // Dots — show last 2 hours only
+            const twoHrsAgo = Date.now() - 7200000;
+            const recent    = entries.filter(e => e.timestamp > twoHrsAgo);
+
+            recent.forEach((entry, i) => {
+                const isLatest = (i === recent.length - 1);
+                // Use stored coords if available, else scatter near town centre
+                const jitterLat = (Math.random() - 0.5) * 0.004;
+                const jitterLng = (Math.random() - 0.5) * 0.004;
+                const lat = entry.lat || (defaultCoords[0] + jitterLat);
+                const lng = entry.lng || (defaultCoords[1] + jitterLng);
+
+                const iconHtml = isLatest
+                    ? `<div class="truck-marker"></div>`
+                    : `<div class="old-marker"></div>`;
+
+                const icon = L.divIcon({
+                    html:      iconHtml,
+                    className: '',
+                    iconSize:  isLatest ? [22, 22] : [12, 12],
+                    iconAnchor: isLatest ? [11, 11] : [6, 6],
+                });
+
+                const marker = L.marker([lat, lng], { icon });
+
+                // Popup showing street name + time if available
+                const minsAgo2 = Math.floor((Date.now() - entry.timestamp) / 60000);
+                const timeStr  = minsAgo2 < 1 ? 'just now' : `${minsAgo2} min ago`;
+                const popupTxt = entry.street
+                    ? `<b>📍 ${entry.street}</b><br>${timeStr}`
+                    : `🗑️ Truck logged<br>${timeStr}`;
+                marker.bindPopup(popupTxt, { closeButton: false, className: 'rr-popup' });
+
+                marker.addTo(leafletMap);
+                mapMarkers.push(marker);
+            });
+
+            // Pan map to latest marker smoothly
+            if (recent.length > 0) {
+                const last2   = recent[recent.length - 1];
+                const lastLat = last2.lat || defaultCoords[0];
+                const lastLng = last2.lng || defaultCoords[1];
+                leafletMap.panTo([lastLat, lastLng], { animate: true, duration: 0.8 });
+            }
+
+            // ETA
+            const last    = entries[entries.length - 1];
+            const minsAgo = Math.floor((Date.now() - last.timestamp) / 60000);
+            lastEl.textContent = minsAgo < 1 ? 'Last report: just now' : `Last report: ${minsAgo} min ago`;
+
+            if (minsAgo < 5) {
+                etaEl.textContent = '🟢 TRUCK NEARBY!'; etaEl.style.color = '#27ae60';
+                lastEtaMins = 0;
+            } else if (minsAgo < 20) {
+                const mins = 20 - minsAgo;
+                etaEl.textContent = `~${mins} min away`; etaEl.style.color = '#27ae60';
+                lastEtaMins = mins;
+            } else if (minsAgo < 60) {
+                etaEl.textContent = `Passed ~${minsAgo} min ago`; etaEl.style.color = '#95a5a6';
+                lastEtaMins = null;
+            } else {
+                etaEl.textContent = 'No recent activity'; etaEl.style.color = '#95a5a6';
+                lastEtaMins = null;
+            }
+
+            // Notify if needed
+            maybeNotify(lastEtaMins, last.street || '');
+
+            // Community feed — most recent first, showing street name if available
+            [...entries].reverse().slice(0, 10).forEach(entry => {
+                const tStr   = new Date(entry.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                const mins   = Math.floor((Date.now() - entry.timestamp) / 60000);
+                const agoStr = mins < 1 ? 'just now' : `${mins} min ago`;
+                const div    = document.createElement('div');
+                div.className = 'feed-item';
+                const streetHtml = entry.street
+                    ? `<span class="street-tag">📍 ${entry.street}</span>`
+                    : '';
+                div.innerHTML = `
+                    <div class="left">
+                        <span>🗑️ Bin logged</span>
+                        ${streetHtml}
+                    </div>
+                    <span class="t">${tStr} · ${agoStr}</span>`;
+                feedEl.appendChild(div);
+                // Track last street for WhatsApp share
+                if (entry.street) lastStreetLogged = entry.street;
+            });
+        });
+
+        // ── ADS: Monthly partner (prominent) + Weekly rotating (subtle) ──
+        // Monthly partners (type='monthly') are always shown as a featured banner.
+        // Weekly ads (type='weekly') rotate randomly below it.
+        // If no monthly partner exists, the prominent slot stays hidden.
+        onValue(ref(db, 'active_ads'), (snap) => {
+            if (!snap.exists()) return;
+            const adsObj  = snap.val();
+            const adsArr  = Object.entries(adsObj).map(([id, val]) => ({ id, ...val }));
+            const monthly = adsArr.filter(a => a.type === 'monthly');
+            const weekly  = adsArr.filter(a => a.type === 'weekly');
+
+            // DEBUG: log to console so you can verify types in Firebase
+            console.log('Active ads:', adsArr.map(a => `${a.name} (${a.type})`));
+
+            // Monthly partner — prominent banner
+            if (monthly.length) {
+                const ad = monthly[0];
+                document.getElementById('monthly-name').textContent = ad.name || '';
+                document.getElementById('monthly-text').textContent = ad.text || '';
+                document.getElementById('monthly-logo').src         = ad.logo || '';
+                const mb = document.getElementById('monthly-banner');
+                mb.style.display = 'block';
+                mb.onclick = () => { if (ad.url) window.open(ad.url, '_blank'); };
+            }
+
+            // Weekly — rotate randomly; if no weekly ads, rotate from all ads
+            const pool = weekly.length ? weekly : adsArr;
+            if (pool.length) {
+                const ad = pool[Math.floor(Math.random() * pool.length)];
+                document.getElementById('ad-name').textContent = ad.name || '';
+                document.getElementById('ad-text').textContent = ad.text || '';
+                document.getElementById('ad-logo').src         = ad.logo || '';
+                const banner = document.getElementById('ad-banner');
+                banner.style.display = 'block';
+                banner.onclick = () => { if (ad.url) window.open(ad.url, '_blank'); };
+            }
+        });
+    }
+
+    // ─── INIT ─────────────────────────────────────────────────
+    updateStarUI();
+    checkSubscription();
+    setInterval(updateTrialDisplay, 60000);
+</script>
+</body>
+</html>

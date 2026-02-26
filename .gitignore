@@ -1,0 +1,71 @@
+##################################################
+# NODE / NPM
+##################################################
+
+node_modules/
+functions/node_modules/
+
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+##################################################
+# FIREBASE
+##################################################
+
+.firebase/
+firestore-debug.log
+ui-debug.log
+firebase-debug.log*
+functions/.runtimeconfig.json
+
+##################################################
+# ENV / SECRETS (VERY IMPORTANT)
+##################################################
+
+.env
+.env.*
+*.env
+
+# Service account keys
+serviceAccountKey.json
+*.serviceAccount.json
+*.key.json
+
+##################################################
+# FLUTTER / DART (if frontend exists)
+##################################################
+
+.dart_tool/
+.packages
+.pub-cache/
+.pub/
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+.flutter-versions
+pubspec.lock
+
+##################################################
+# IDE / EDITOR
+##################################################
+
+.vscode/
+.idea/
+*.iml
+
+##################################################
+# OS FILES
+##################################################
+
+.DS_Store
+Thumbs.db
+
+##################################################
+# BUILD / TEMP
+##################################################
+
+dist/
+coverage/
+tmp/

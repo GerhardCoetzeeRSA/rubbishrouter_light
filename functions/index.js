@@ -15,13 +15,14 @@ admin.initializeApp();
 const db = admin.database();
 
 // ── CREDENTIALS ───────────────────────────────────────────────
-const MERCHANT_ID     = "76032";
-const DEFAULT_SITE_ID = "96013";  // resident subscriptions
-const BIZ_SITE_ID     = "96037";  // business/ad payments
-const MERCHANT_API_KEY = "6c48d74081e0421bb1afce2edc9b4dde";
+const MERCHANT_ID           = "76032";
+const DEFAULT_SITE_ID       = "96013";  // resident subscriptions
+const BIZ_SITE_ID           = "96037";  // business/ad payments
+const MERCHANT_API_KEY      = "6c48d74081e0421bb1afce2edc9b4dde";
+const MERCHANT_SITE_API_KEY = "d0a399b1ee004f45b046e0de553d5fe1";
 
-// Zapper uses Bearer token auth, NOT Basic auth
-const AUTH_HEADER = `Bearer ${MERCHANT_API_KEY}`;
+// Zapper Business API = Basic Base64(merchantApiKey:merchantSiteApiKey)
+const AUTH_HEADER = "Basic " + Buffer.from(`${MERCHANT_API_KEY}:${MERCHANT_SITE_API_KEY}`).toString("base64");
 
 
 // ════════════════════════════════════════════════════════════════

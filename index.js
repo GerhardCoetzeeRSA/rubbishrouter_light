@@ -15,15 +15,14 @@ admin.initializeApp();
 const db = admin.database();
 
 // ── CREDENTIALS ───────────────────────────────────────────────
-const MERCHANT_API_KEY      = "6c48d74081e0421bb1afce2edc9b4dde";
-const MERCHANT_SITE_API_KEY = "1b8ba011df7b45e09c107e35aa70710c";
-const MERCHANT_ID           = "76032";
-const DEFAULT_SITE_ID       = "96013";  // resident subscriptions
-const BIZ_SITE_ID           = "96037";  // business/ad payments
+const MERCHANT_ID     = "76032";
+const DEFAULT_SITE_ID = "96013";  // resident subscriptions
+const BIZ_SITE_ID     = "96037";  // business/ad payments
+const POS_KEY         = "FF4CD3B1-A3EF-4BE0-8498-84CC0D3CE5A8";
+const POS_SECRET      = "3572C969-4B8A-44D2-ABD9-B6E03FAA34C4";
 
-const AUTH_HEADER = "Basic " + Buffer.from(
-    `${MERCHANT_API_KEY}:${MERCHANT_SITE_API_KEY}`
-).toString("base64");
+// Zapper auth = Basic Base64(posKey:posSecret)
+const AUTH_HEADER = "Basic " + Buffer.from(`${POS_KEY}:${POS_SECRET}`).toString("base64");
 
 
 // ════════════════════════════════════════════════════════════════
@@ -50,7 +49,7 @@ exports.createZapperInvoice = functions.https.onRequest((req, res) => {
 
     const payload = JSON.stringify({
         currencyISOCode: "ZAR",
-        amount:          amountCents,
+        amount:          amountCents / 100,  // Zapper expects rands not cents
         siteReference:   reference,
         reference:       reference,
     });
@@ -68,6 +67,7 @@ exports.createZapperInvoice = functions.https.onRequest((req, res) => {
         }
     };
 
+    console.log("Calling Zapper API — siteId:", activeSiteId, "amount:", amountCents/100, "ref:", reference);
     let responseData = "";
     const apiReq = https.request(options, (apiRes) => {
         apiRes.on("data", chunk => responseData += chunk);

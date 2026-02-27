@@ -214,6 +214,7 @@
         <p id="gate-desc">The community-powered map that tells you when the garbage truck is near your street. Start your <strong>14-day free trial</strong> — no card needed.</p>
         <button id="gate-button" onclick="startTrial()">🚀 START FREE TRIAL</button>
         <small>Then just R15/month to keep tracking.</small>
+        <small style="margin-top:8px; display:block;"><a href="#" onclick="simulateExpired()" style="color:#e74c3c; font-size:10px;">Test payment screen</a></small>
     </div>
 </div>
 
@@ -445,6 +446,12 @@
         localStorage.setItem('rr_trial_start', Date.now().toString());
         document.getElementById('subscription-gate').style.display = 'none';
         updateTrialDisplay(); updateStarUI(); loadData(); loadRouteLearning(); showNotifBanner();
+    };
+    window.simulateExpired = () => {
+        // Sets trial start to 15 days ago so lockAppForPayment triggers
+        localStorage.setItem('rr_user_status', 'trial');
+        localStorage.setItem('rr_trial_start', (Date.now() - 15 * 86400000).toString());
+        location.reload();
     };
     function lockAppForPayment() {
         document.getElementById('subscription-gate').style.display = 'flex';

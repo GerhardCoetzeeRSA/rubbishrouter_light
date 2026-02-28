@@ -436,6 +436,13 @@
     function checkSubscription() {
         const status     = localStorage.getItem('rr_user_status');
         const trialStart = parseInt(localStorage.getItem('rr_trial_start') || '0');
+        // Admin preview mode — bypass all gates (expires after 1 hour)
+        const adminPreview = parseInt(localStorage.getItem('rr_admin_preview') || '0');
+        if (adminPreview && Date.now() - adminPreview < 3600000) {
+            updateTrialDisplay(); loadData(); loadRouteLearning(); showNotifBanner(); return;
+        } else if (adminPreview) {
+            localStorage.removeItem('rr_admin_preview'); // expired, clean up
+        }
         if (!status) { document.getElementById('subscription-gate').style.display = 'flex'; return; }
         if (status === 'trial' && Date.now() - trialStart > 14 * 86400000) { lockAppForPayment(); return; }
         updateTrialDisplay(); loadData(); loadRouteLearning(); showNotifBanner();

@@ -60,6 +60,22 @@
             </div>
 
             <div class="lg:col-span-1">
+                <div class="admin-card border-t-4 border-green-400 mb-6">
+                    <h2 class="text-sm font-black text-slate-400 uppercase tracking-widest mb-4">Create Ad Manually</h2>
+                    <div class="space-y-3">
+                        <input id="new-ad-name" type="text" placeholder="Business name *" class="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 outline-none focus:border-slate-400">
+                        <input id="new-ad-text" type="text" placeholder="Ad message (60 chars) *" maxlength="60" class="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 outline-none focus:border-slate-400">
+                        <input id="new-ad-logo" type="text" placeholder="Logo URL (optional)" class="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 outline-none focus:border-slate-400">
+                        <input id="new-ad-link" type="text" placeholder="Click-through URL (optional)" class="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 outline-none focus:border-slate-400">
+                        <select id="new-ad-type" class="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 outline-none focus:border-slate-400">
+                            <option value="weekly">🔄 Weekly (R70)</option>
+                            <option value="monthly">⭐ Monthly (R450)</option>
+                        </select>
+                        <button onclick="createAdManually()" class="w-full bg-green-600 text-white text-xs font-black py-2.5 rounded-xl uppercase tracking-widest hover:bg-green-700">+ Create Ad</button>
+                        <div id="create-ad-status" class="text-xs text-center text-slate-400"></div>
+                    </div>
+                </div>
+
                 <div class="admin-card border-t-4 border-yellow-400 h-full">
                     <h2 class="text-sm font-black text-slate-400 uppercase tracking-widest mb-6">Pending Business Ads</h2>
                     <div id="pending-ads-list" class="space-y-4 text-center py-10 text-slate-300 italic">
@@ -236,6 +252,30 @@
                 await push(routeRef, { timestamp: Date.now() - (i * 300000), v: 1.0 });
             }
             alert("✅ Simulated 3 dots for Potchefstroom.");
+        };
+
+        window.createAdManually = async () => {
+            const name = document.getElementById('new-ad-name').value.trim();
+            const text = document.getElementById('new-ad-text').value.trim();
+            const logo = document.getElementById('new-ad-logo').value.trim();
+            const link = document.getElementById('new-ad-link').value.trim();
+            const type = document.getElementById('new-ad-type').value;
+            const status = document.getElementById('create-ad-status');
+
+            if (!name || !text) { status.textContent = '⚠️ Name and message are required.'; return; }
+
+            const id = 'MANUAL-' + Date.now();
+            await set(ref(db, `ads/${id}`), {
+                name, text, logo: logo || null, link: link || null,
+                type, status: 'active', createdAt: Date.now(), manual: true
+            });
+
+            status.textContent = '✅ Ad created and live!';
+            document.getElementById('new-ad-name').value = '';
+            document.getElementById('new-ad-text').value = '';
+            document.getElementById('new-ad-logo').value = '';
+            document.getElementById('new-ad-link').value = '';
+            setTimeout(() => status.textContent = '', 3000);
         };
 
         window.approveAd = (id) => {

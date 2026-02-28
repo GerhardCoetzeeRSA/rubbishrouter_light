@@ -265,7 +265,7 @@
             if (!name || !text) { status.textContent = '⚠️ Name and message are required.'; return; }
 
             const id = 'MANUAL-' + Date.now();
-            await set(ref(db, `ads/${id}`), {
+            await set(ref(db, `active_ads/${id}`), {
                 name, text, logo: logo || null, link: link || null,
                 type, status: 'active', createdAt: Date.now(), manual: true
             });

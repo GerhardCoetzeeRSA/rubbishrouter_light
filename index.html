@@ -2,113 +2,206 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>RubbishRouter | Welcome</title>
+    <title>RubbishRouter | Select Your Area</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
-        :root { --primary: #27ae60; --dark: #2c3e50; --accent: #f1c40f; }
-        body { font-family: 'Segoe UI', sans-serif; margin: 0; background: #f4f7f6; display: flex; flex-direction: column; align-items: center; }
-        .hero { background: var(--primary); color: white; width: 100%; padding: 40px 20px; text-align: center; box-sizing: border-box; }
-        .container { max-width: 450px; width: 90%; padding: 20px; text-align: center; }
-        .card { background: white; padding: 25px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); margin-top: -30px; }
-        
-        select, button, input { width: 100%; padding: 15px; margin: 10px 0; border-radius: 10px; border: 1px solid #ddd; font-size: 16px; box-sizing: border-box; }
-        button { background: var(--primary); color: white; border: none; font-weight: bold; cursor: pointer; }
-        .btn-add { background: none; color: var(--primary); border: 2px dashed var(--primary); margin-top: 5px; font-size: 14px; }
-        
-        #new-town-name { display: none; border: 2px solid var(--accent); }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Segoe UI', sans-serif; background: #f0f4f0; min-height: 100vh; }
+        .hero { background: linear-gradient(135deg, #1a5c34 0%, #27ae60 100%); color: white; padding: 36px 20px 60px; text-align: center; }
+        .hero h1 { font-size: 2.2rem; font-weight: 900; letter-spacing: -1px; }
+        .hero p  { font-size: 0.85rem; opacity: 0.85; margin-top: 6px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; }
+        .search-wrap { max-width: 480px; margin: -28px auto 0; padding: 0 16px; position: relative; z-index: 10; }
+        .search-wrap input { width: 100%; padding: 16px 20px 16px 46px; border-radius: 16px; border: none; box-shadow: 0 8px 30px rgba(0,0,0,0.15); font-size: 15px; outline: none; color: #2c3e50; }
+        .search-icon { position: absolute; left: 30px; top: 50%; transform: translateY(-50%); font-size: 18px; pointer-events: none; }
+        .container { max-width: 480px; margin: 0 auto; padding: 20px 16px 40px; }
+        .region { margin-bottom: 24px; }
+        .region-header { display: flex; align-items: center; gap: 8px; font-size: 0.7rem; font-weight: 900; color: #888; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 10px; padding: 0 4px; }
+        .region-header::after { content: ''; flex: 1; height: 1px; background: #ddd; }
+        .tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .tile { background: white; border-radius: 16px; padding: 16px 14px; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.06); border: 2px solid transparent; transition: all 0.18s ease; text-align: left; }
+        .tile:hover  { border-color: #27ae60; transform: translateY(-2px); box-shadow: 0 6px 20px rgba(39,174,96,0.15); }
+        .tile.active { border-color: #27ae60; background: #f0faf4; }
+        .tile-name   { font-size: 0.95rem; font-weight: 800; color: #2c3e50; }
+        .tile-sub    { font-size: 0.72rem; color: #999; margin-top: 3px; font-weight: 600; }
+        .tile-dot    { width: 7px; height: 7px; background: #27ae60; border-radius: 50%; display: inline-block; margin-right: 5px; animation: pulse 2s infinite; }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+        .tile.zone .tile-name { font-size: 0.88rem; }
+        .zone-parent { font-size: 0.65rem; color: #27ae60; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 2px; }
+        .go-btn { width: 100%; padding: 18px; border-radius: 16px; background: #27ae60; color: white; border: none; font-size: 1rem; font-weight: 900; letter-spacing: 1px; text-transform: uppercase; cursor: pointer; box-shadow: 0 6px 20px rgba(39,174,96,0.4); transition: all 0.2s; margin-top: 8px; display: none; }
+        .go-btn.visible { display: block; }
+        .go-btn:hover { background: #219a52; transform: translateY(-1px); }
+        .selected-label { text-align: center; font-size: 0.8rem; font-weight: 700; color: #27ae60; margin-bottom: 8px; min-height: 20px; display: none; }
+        .selected-label.visible { display: block; }
+        .add-section { margin-top: 28px; padding: 20px; background: white; border-radius: 16px; border: 2px dashed #c8e6c9; text-align: center; }
+        .add-section p { font-size: 0.8rem; color: #999; margin-bottom: 12px; }
+        .add-section input { width: 100%; padding: 12px 16px; border-radius: 12px; border: 1.5px solid #ddd; font-size: 14px; outline: none; margin-bottom: 8px; display: none; }
+        .add-section input:focus { border-color: #27ae60; }
+        .btn-add { background: none; color: #27ae60; border: none; font-size: 0.85rem; font-weight: 700; cursor: pointer; text-decoration: underline; }
+        .btn-save { width: 100%; padding: 12px; border-radius: 12px; background: #2c3e50; color: white; border: none; font-weight: 700; cursor: pointer; display: none; font-size: 0.85rem; }
+        .footer-links { text-align: center; margin-top: 24px; padding-bottom: 20px; }
+        .footer-links a { color: #aaa; font-size: 0.78rem; text-decoration: none; margin: 0 8px; }
+        .footer-links a:hover { color: #27ae60; }
+        .no-results { text-align: center; color: #bbb; font-size: 0.85rem; padding: 30px 0; display: none; }
     </style>
 </head>
 <body>
 
-    <div class="hero">
-        <h1>RubbishRouter</h1>
-        <p>Smart City Community Network</p>
+<div class="hero">
+    <h1>🗑️ RubbishRouter</h1>
+    <p>Live Community Waste Tracker</p>
+</div>
+
+<div class="search-wrap">
+    <span class="search-icon">🔍</span>
+    <input type="text" id="search-input" placeholder="Search your town or area..." oninput="filterTiles()">
+</div>
+
+<div class="container">
+    <div class="selected-label" id="selected-label"></div>
+    <div id="tiles-container"></div>
+    <div class="no-results" id="no-results">No areas found. Add yours below.</div>
+    <button class="go-btn" id="go-btn" onclick="goToApp()">📍 Enter Live Map</button>
+
+    <div class="add-section">
+        <p>Don't see your town or area?</p>
+        <button class="btn-add" id="show-add-btn" onclick="toggleAdd()">+ Add my town</button>
+        <input type="text" id="new-town-name" placeholder="e.g. Rustenburg or Pretoria-East">
+        <button class="btn-save" id="save-town-btn" onclick="addNewTown()">Register Town</button>
     </div>
 
-    <div class="container">
-        <div class="card">
-            <h3>Select Your Municipality</h3>
-            
-            <select id="muni-select">
-                <option value="">Loading towns...</option>
-            </select>
-
-            <button onclick="goToApp()">ENTER LIVE MAP</button>
-
-            <div id="add-area">
-                <button class="btn-add" id="show-add-btn" onclick="toggleAdd()">+ My town isn't listed</button>
-                <input type="text" id="new-town-name" placeholder="Enter Town Name (e.g. Rustenburg)">
-                <button id="save-town-btn" style="display:none; background:var(--dark);" onclick="addNewTown()">REGISTER TOWN</button>
-            </div>
-            
-            <a href="how-it-works.html" style="display:block; margin-top:20px; color:#666; font-size:14px; text-decoration:none;">❓ How it works & Pricing</a>
-        </div>
+    <div class="footer-links">
+        <a href="how-it-works.html">❓ How it works</a>
+        <a href="biz.html">📢 Advertise</a>
+        <a href="legal.html">Privacy</a>
     </div>
+</div>
 
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
-        import { getDatabase, ref, onValue, set, get } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-database.js";
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
+    import { getDatabase, ref, onValue, set } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-database.js";
 
-        const firebaseConfig = {
-            apiKey: "AIzaSyAm4QtyA82HBJ-VwBgIlzRHmDgzxxhryNY",
-            databaseURL: "https://rubbishrouter-688b2-default-rtdb.firebaseio.com/",
-            projectId: "rubbishrouter-688b2",
-        };
+    const firebaseConfig = {
+        apiKey:      "AIzaSyAm4QtyA82HBJ-VwBgIlzRHmDgzxxhryNY",
+        databaseURL: "https://rubbishrouter-688b2-default-rtdb.firebaseio.com/",
+        projectId:   "rubbishrouter-688b2",
+    };
 
-        const app = initializeApp(firebaseConfig);
-        const db = getDatabase(app);
-        const listRef = ref(db, 'registry/towns');
+    const app = initializeApp(firebaseConfig);
+    const db  = getDatabase(app);
 
-        // 1. Load towns from Firebase
-        onValue(listRef, (snap) => {
-            const select = document.getElementById('muni-select');
-            select.innerHTML = "";
-            const towns = snap.val();
-            
-            if (towns) {
-                Object.keys(towns).forEach(t => {
-                    let opt = document.createElement('option');
-                    opt.value = t;
-                    opt.innerHTML = t;
-                    select.appendChild(opt);
-                });
-            } else {
-                // Default if list is empty
-                let opt = document.createElement('option');
-                opt.value = "Potchefstroom";
-                opt.innerHTML = "Potchefstroom";
-                select.appendChild(opt);
+    const REGIONS = [
+        { label: "🏘️ North West",   prefixes: ["Potchefstroom","Klerksdorp","Rustenburg","Mahikeng","Lichtenburg","Vryburg","Brits","Hartswater","Wolmaransstad","Delareyville","Carletonville"] },
+        { label: "🏙️ Pretoria",     prefixes: ["Pretoria"] },
+        { label: "🏙️ Johannesburg", prefixes: ["Johannesburg","Soweto","Sandton","Randburg","Roodepoort"] },
+        { label: "🏙️ Cape Town",    prefixes: ["Cape Town","Bellville","Stellenbosch","Somerset West","Paarl"] },
+        { label: "🏙️ Durban",       prefixes: ["Durban","Umhlanga","Pinetown","Chatsworth"] },
+        { label: "🌍 Other Areas",   prefixes: [] },
+    ];
+
+    let allTowns = [];
+    let selected = null;
+
+    onValue(ref(db, 'registry/towns'), (snap) => {
+        allTowns = snap.exists() ? Object.keys(snap.val()) : ["Potchefstroom","Klerksdorp"];
+        renderTiles(allTowns);
+    });
+
+    function renderTiles(towns) {
+        const container = document.getElementById('tiles-container');
+        container.innerHTML = "";
+
+        const grouped = {};
+        REGIONS.forEach(r => grouped[r.label] = []);
+
+        towns.forEach(town => {
+            let placed = false;
+            for (const region of REGIONS.slice(0, -1)) {
+                if (region.prefixes.some(p => town.startsWith(p))) {
+                    grouped[region.label].push(town);
+                    placed = true; break;
+                }
             }
+            if (!placed) grouped["🌍 Other Areas"].push(town);
         });
 
-        // 2. Navigation
-        window.goToApp = () => {
-            const muni = document.getElementById('muni-select').value;
-            if(!muni) return alert("Please select or add a town.");
-            window.location.href = `light.html?v=3&muni=${muni}`;
-        };
+        let anyRendered = false;
+        REGIONS.forEach(region => {
+            const list = grouped[region.label];
+            if (!list || list.length === 0) return;
+            anyRendered = true;
 
-        // 3. Add New Town UI
-        window.toggleAdd = () => {
-            document.getElementById('new-town-name').style.display = 'block';
-            document.getElementById('save-town-btn').style.display = 'block';
-            document.getElementById('show-add-btn').style.display = 'none';
-        };
+            const regionDiv = document.createElement('div');
+            regionDiv.className = 'region';
 
-        // 4. Save New Town to Firebase
-        window.addNewTown = async () => {
-            const name = document.getElementById('new-town-name').value.trim();
-            if(!name || name.length < 3) return alert("Please enter a valid town name.");
-            
-            // Format name (Proper Case)
-            const formattedName = name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
-            
-            const townRef = ref(db, `registry/towns/${formattedName}`);
-            await set(townRef, { active: true, createdAt: Date.now() });
-            
-            alert(`${formattedName} has been added! You can now select it from the list.`);
-            location.reload();
-        };
-    </script>
+            regionDiv.innerHTML = `<div class="region-header">${region.label}</div>`;
+
+            const tilesDiv = document.createElement('div');
+            tilesDiv.className = 'tiles';
+
+            list.forEach(town => {
+                const isZone   = town.includes('-');
+                const parts    = town.split('-');
+                const mainName = parts[parts.length - 1].trim();
+                const parent   = parts.length > 1 ? parts[0].trim() : '';
+
+                const tile = document.createElement('div');
+                tile.className = `tile${isZone ? ' zone' : ''}`;
+                tile.dataset.town = town;
+                tile.onclick = () => selectTown(town, tile);
+                tile.innerHTML = `
+                    ${isZone ? `<div class="zone-parent">${parent}</div>` : ''}
+                    <div class="tile-name"><span class="tile-dot"></span>${mainName}</div>
+                    <div class="tile-sub">${isZone ? 'Zone' : 'Municipality'}</div>`;
+                tilesDiv.appendChild(tile);
+            });
+
+            regionDiv.appendChild(tilesDiv);
+            container.appendChild(regionDiv);
+        });
+
+        document.getElementById('no-results').style.display = anyRendered ? 'none' : 'block';
+    }
+
+    window.selectTown = (town, tile) => {
+        document.querySelectorAll('.tile').forEach(t => t.classList.remove('active'));
+        tile.classList.add('active');
+        selected = town;
+        const label = document.getElementById('selected-label');
+        label.textContent = `📍 Selected: ${town}`;
+        label.classList.add('visible');
+        const btn = document.getElementById('go-btn');
+        btn.classList.add('visible');
+        btn.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    };
+
+    window.filterTiles = () => {
+        const q = document.getElementById('search-input').value.toLowerCase().trim();
+        if (!q) { renderTiles(allTowns); return; }
+        const filtered = allTowns.filter(t => t.toLowerCase().includes(q));
+        renderTiles(filtered);
+    };
+
+    window.goToApp = () => {
+        if (!selected) return;
+        localStorage.setItem('rr_last_muni', selected);
+        window.location.href = `light.html?muni=${encodeURIComponent(selected)}`;
+    };
+
+    window.toggleAdd = () => {
+        document.getElementById('new-town-name').style.display = 'block';
+        document.getElementById('save-town-btn').style.display = 'block';
+        document.getElementById('show-add-btn').style.display = 'none';
+        document.getElementById('new-town-name').focus();
+    };
+
+    window.addNewTown = async () => {
+        const raw  = document.getElementById('new-town-name').value.trim();
+        if (!raw || raw.length < 3) return alert("Please enter a valid name.");
+        const name = raw.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+        await set(ref(db, `registry/towns/${name}`), { active: true, createdAt: Date.now() });
+        alert(`${name} added! Select it from the list.`);
+        location.reload();
+    };
+</script>
 </body>
 </html>

@@ -136,6 +136,10 @@
 
         function loadAllData() {
             const today = new Date().toISOString().split('T')[0];
+            // SAST is UTC+2 — logs may be stored under SAST date
+            const sastToday = new Date(Date.now() + 2 * 3600000).toISOString().split('T')[0];
+            const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+            const checkDates = [...new Set([sastToday, today, yesterday])];
 
             // 1. PENDING ADS LIST
             onValue(ref(db, 'pending_ads'), (snap) => {
@@ -176,33 +180,37 @@
                 let foundToday = false;
 
                 Object.keys(allTowns).forEach(town => {
-                    const townData = allTowns[town][today];
-                    if(townData) {
-                        foundToday = true;
-                        const count = Object.keys(townData).length;
-                        
-                        // Update Town Breakdown
-                        activityList.innerHTML += `
-                            <div class="flex justify-between items-center bg-slate-50 p-3 rounded-xl">
-                                <span class="text-xs font-black text-slate-700">${town}</span>
-                                <span class="bg-purple-100 text-purple-700 text-[10px] font-black px-2 py-1 rounded-full">${count} PINGS</span>
-                            </div>`;
+                    // Check today (SAST), today (UTC), and yesterday to catch timezone edge cases
+                    checkDates.forEach(dateKey => {
+                        const townData = allTowns[town][dateKey];
+                        if(townData) {
+                            foundToday = true;
+                            const count = Object.keys(townData).length;
 
-                        // Update Live Logs
-                        Object.entries(townData).forEach(([entryKey, entry]) => {
-                            const time = new Date(entry.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-                            const street = entry.street ? `<span class="text-[10px] text-slate-500 italic">${entry.street}</span>` : '';
-                            const path = `routes/${town}/${today}/${entryKey}`;
-                            logList.innerHTML = `
-                                <div class="flex justify-between items-center p-3 border-b border-slate-50 gap-2">
-                                    <span class="text-xs font-bold text-slate-700">${time}</span>
-                                    <span class="text-[10px] text-slate-400 font-bold uppercase">${town}</span>
-                                    ${street}
-                                    <span class="text-[10px] text-green-500 font-black">LOGGED</span>
-                                    <button onclick="deleteLog('${path}')" class="text-red-300 hover:text-red-500 text-xs font-bold px-1" title="Delete this entry">×</button>
-                                </div>` + logList.innerHTML;
-                        });
-                    }
+                            // Update Town Breakdown
+                            activityList.innerHTML += `
+                                <div class="flex justify-between items-center bg-slate-50 p-3 rounded-xl">
+                                    <span class="text-xs font-black text-slate-700">${town}</span>
+                                    <span class="text-[9px] text-slate-400">${dateKey}</span>
+                                    <span class="bg-purple-100 text-purple-700 text-[10px] font-black px-2 py-1 rounded-full">${count} PINGS</span>
+                                </div>`;
+
+                            // Update Live Logs
+                            Object.entries(townData).forEach(([entryKey, entry]) => {
+                                const time = new Date(entry.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                                const street = entry.street ? `<span class="text-[10px] text-slate-500 italic">${entry.street}</span>` : '';
+                                const path = `routes/${town}/${dateKey}/${entryKey}`;
+                                logList.innerHTML = `
+                                    <div class="flex justify-between items-center p-3 border-b border-slate-50 gap-2">
+                                        <span class="text-xs font-bold text-slate-700">${time}</span>
+                                        <span class="text-[10px] text-slate-400 font-bold uppercase">${town}</span>
+                                        ${street}
+                                        <span class="text-[10px] text-green-500 font-black">LOGGED</span>
+                                        <button onclick="deleteLog('${path}')" class="text-red-300 hover:text-red-500 text-xs font-bold px-1" title="Delete this entry">×</button>
+                                    </div>` + logList.innerHTML;
+                            });
+                        }
+                    });
                 });
                 
                 if(!foundToday) {

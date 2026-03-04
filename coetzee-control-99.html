@@ -189,13 +189,17 @@
                             </div>`;
 
                         // Update Live Logs
-                        Object.values(townData).forEach(entry => {
+                        Object.entries(townData).forEach(([entryKey, entry]) => {
                             const time = new Date(entry.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                            const street = entry.street ? `<span class="text-[10px] text-slate-500 italic">${entry.street}</span>` : '';
+                            const path = `routes/${town}/${today}/${entryKey}`;
                             logList.innerHTML = `
-                                <div class="flex justify-between items-center p-3 border-b border-slate-50">
+                                <div class="flex justify-between items-center p-3 border-b border-slate-50 gap-2">
                                     <span class="text-xs font-bold text-slate-700">${time}</span>
                                     <span class="text-[10px] text-slate-400 font-bold uppercase">${town}</span>
+                                    ${street}
                                     <span class="text-[10px] text-green-500 font-black">LOGGED</span>
+                                    <button onclick="deleteLog('${path}')" class="text-red-300 hover:text-red-500 text-xs font-bold px-1" title="Delete this entry">×</button>
                                 </div>` + logList.innerHTML;
                         });
                     }
@@ -315,6 +319,7 @@
             if (town) window.open(`light.html?muni=${encodeURIComponent(town)}`, '_blank');
         };
 
+        window.deleteLog = (path) => { if(confirm("Delete this log entry?")) remove(ref(db, path)); };
         window.deleteData = (path) => { if(confirm("Permanently delete?")) remove(ref(db, path)); };
         window.clearLogs = () => { if(confirm("Wipe today's map logs?")) remove(ref(db, `routes`)); };
     </script>

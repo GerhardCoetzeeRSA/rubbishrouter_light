@@ -178,6 +178,8 @@
 
                 const allTowns = snap.val();
                 let foundToday = false;
+                console.log("Routes data:", JSON.stringify(allTowns));
+                console.log("Checking dates:", checkDates);
 
                 Object.keys(allTowns).forEach(town => {
                     // Check today (SAST), today (UTC), and yesterday to catch timezone edge cases

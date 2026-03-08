@@ -667,6 +667,22 @@
             const twoHrsAgo = Date.now() - 7200000;
             const recent    = entries.filter(e => e.timestamp > twoHrsAgo);
 
+            // ── Breadcrumb trail — draw polyline through all GPS-logged points ──
+            const trailCoords = recent
+                .filter(e => e.lat && e.lng)
+                .map(e => [e.lat, e.lng]);
+
+            if (trailCoords.length > 1) {
+                const trail = L.polyline(trailCoords, {
+                    color: '#27ae60',
+                    weight: 3,
+                    opacity: 0.6,
+                    dashArray: '6, 8',
+                    lineJoin: 'round'
+                }).addTo(leafletMap);
+                mapMarkers.push(trail);
+            }
+
             recent.forEach((entry, i) => {
                 const isLatest = (i === recent.length - 1);
                 // Use stored coords if available, else scatter near town centre

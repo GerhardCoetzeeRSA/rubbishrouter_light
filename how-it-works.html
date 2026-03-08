@@ -11,10 +11,14 @@
         .container { max-width: 700px; margin: -40px auto 40px; background: white; padding: 30px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
         .step { display: flex; align-items: flex-start; margin-bottom: 30px; gap: 20px; }
         .step-num { background: var(--primary); color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; flex-shrink: 0; }
-        .price-card { background: #fff9f0; border: 2px dashed var(--accent); padding: 20px; border-radius: 15px; text-align: center; margin: 30px 0; }
+        .free-card { background: #f0faf5; border: 2px solid var(--primary); padding: 20px; border-radius: 15px; margin: 30px 0; }
+        .pro-card  { background: #fff9f0; border: 2px dashed var(--accent); padding: 20px; border-radius: 15px; text-align: center; margin: 20px 0; }
         .btn-start { background: var(--primary); color: white; text-decoration: none; padding: 18px 40px; border-radius: 12px; display: block; text-align: center; font-weight: bold; font-size: 18px; margin-top: 20px; }
         h2 { color: var(--dark); border-bottom: 2px solid #eee; padding-bottom: 10px; }
         .faq { font-size: 14px; background: #f9f9f9; padding: 15px; border-radius: 10px; margin-top: 10px; }
+        .tag { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; }
+        .tag.free { background: #e8f8f0; color: var(--primary); }
+        .tag.pro  { background: #fff3e0; color: var(--accent); }
     </style>
 </head>
 <body>
@@ -30,43 +34,63 @@
     <div class="step">
         <div class="step-num">1</div>
         <div>
-            <strong>Open the Map:</strong> See your neighborhood in real-time. If a neighbor reports a truck nearby, a green dot appears on your street.
+            <strong>Open the Map:</strong> See your neighbourhood in real time. If a neighbour reports a truck nearby, a green dot appears on the live map.
         </div>
     </div>
 
     <div class="step">
         <div class="step-num">2</div>
         <div>
-            <strong>Get the ETA:</strong> Our system calculates the distance between the last reported "breadcrumb" and your house, giving you an estimated time to get your bin out.
+            <strong>Get the ETA:</strong> The app calculates how far the truck is from your street and shows an estimated arrival time.
         </div>
     </div>
 
     <div class="step">
         <div class="step-num">3</div>
         <div>
-            <strong>Pay it Forward:</strong> When your bin is emptied, tap the <strong>"✅ Log My Bin"</strong> button. This alerts everyone further down the route!
+            <strong>Pay it Forward:</strong> When your bin is emptied, tap <strong>"✅ Log My Bin"</strong> to alert everyone further down the route!
         </div>
     </div>
 
-    <div class="price-card">
-        <h3>14-Day Free Trial</h3>
-        <p>Every new resident gets 2 weeks of full access. After that, join the community for just:</p>
-        <div style="font-size: 32px; font-weight: bold; color: var(--dark);">R15 / month</div>
-        <p style="font-size: 12px; color: #666;">Secure payments via <strong>Zapper</strong></p>
+    <h2>Pricing</h2>
+
+    <div class="free-card">
+        <span class="tag free">Free — Always</span>
+        <ul style="margin-top: 12px; padding-left: 20px; font-size: 14px; line-height: 2;">
+            <li>✅ Live map with truck sightings</li>
+            <li>✅ Estimated truck arrival time</li>
+            <li>✅ Community feed</li>
+            <li>✅ Log the truck for your neighbours</li>
+        </ul>
+    </div>
+
+    <div class="pro-card">
+        <span class="tag pro">⭐ Pro — R15/month</span>
+        <div style="font-size: 28px; font-weight: 900; color: var(--dark); margin: 10px 0;">R15 <span style="font-size:14px; font-weight:400; color:#666;">/month</span></div>
+        <ul style="text-align: left; margin: 0 auto; display: inline-block; font-size: 14px; line-height: 2;">
+            <li>🔔 Push notification when truck is near your street</li>
+            <li>⭐ Pro member badge</li>
+        </ul>
+        <p style="font-size: 11px; color: #aaa; margin-top: 10px;">Secure payment via Zapper · Cancel anytime</p>
     </div>
 
     <h2>FAQ</h2>
     <div class="faq">
         <strong>Is this an official municipal app?</strong><br>
-        No. This is a private community network. We believe neighbors helping neighbors is the fastest way to solve "Bin Day" stress.
+        No. This is a private community network. Neighbours helping neighbours is the fastest way to solve "Bin Day" stress.
     </div>
     
     <div class="faq" style="margin-top:15px;">
-        <strong>Why R15 per month?</strong><br>
-        This fee covers the high-speed map servers, GPS processing, and keeps the app ad-free for residents.
+        <strong>Why is the map free?</strong><br>
+        Residents are the ones providing the data by logging the truck. It makes sense that tracking is free for everyone. The Pro upgrade covers server costs and keeps the app ad-free for non-Pro users.
     </div>
 
-    <a href="index.html" class="btn-start">GET STARTED NOW</a>
+    <div class="faq" style="margin-top:15px;">
+        <strong>What do I get with Pro?</strong><br>
+        A push notification sent directly to your phone the moment the truck is reported near your street — even when the app is closed. No more checking the app manually.
+    </div>
+
+    <a href="index.html" class="btn-start">GET STARTED — FREE</a>
 
     <div style="text-align: center; margin-top: 30px;">
         <a href="legal.html" style="color:#aaa; font-size:11px; text-decoration:none;">Terms of Service & Privacy Policy</a>

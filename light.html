@@ -2,6 +2,9 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>RubbishRouter | Live Map</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -217,9 +220,9 @@
     <div class="gate-box">
         <div class="gate-icon">🗑️</div>
         <h2 id="gate-title">Welcome to RubbishRouter</h2>
-        <p id="gate-desc">The community-powered map that tells you when the garbage truck is near your street. Start your <strong>14-day free trial</strong> — no card needed.</p>
-        <button id="gate-button" onclick="startTrial()">🚀 START FREE TRIAL</button>
-        <small>Then just R15/month to keep tracking.</small>
+        <p id="gate-desc">The community-powered map that shows where the rubbish truck is — updated by your neighbours in real time. <strong>Free to use.</strong> Upgrade to Pro for truck arrival notifications.</p>
+        <button id="gate-button" onclick="startFree()">🚀 START TRACKING — FREE</button>
+        <small>Upgrade to Pro for R15/month to get notified when the truck is near.</small>
     </div>
 </div>
 
@@ -238,7 +241,7 @@
 
     <!-- EVAL CARD -->
     <div class="card eval-card">
-        <div id="trial-tag">Trial: <span id="days-left">14</span> Days Left</div>
+        <div id="trial-tag" style="display:none;">⭐ PRO</div>
         <div id="star-icon" class="star grey">★</div>
         <div class="eval-mid">
             <div class="lbl">Resident Status</div>
@@ -284,7 +287,16 @@
     <!-- PUSH NOTIFICATION INVITE -->
     <div id="notif-banner">
         <p>🔔 <strong>Get notified when the truck is nearby</strong> — even when the app is closed.</p>
-        <button id="notif-btn" onclick="requestPushPermission()">Enable Alerts</button>
+        <button id="notif-btn" onclick="handleNotifRequest()">Enable Alerts</button>
+    </div>
+
+    <!-- PRO UPGRADE PROMPT (shown when free user tries to enable notifications) -->
+    <div id="pro-gate" style="display:none; background:#2c3e50; color:white; border-radius:16px; padding:20px; margin-bottom:16px; text-align:center;">
+        <div style="font-size:28px; margin-bottom:8px;">⭐</div>
+        <div style="font-weight:900; font-size:1rem; margin-bottom:8px;">Upgrade to Pro</div>
+        <p style="font-size:0.8rem; opacity:0.8; margin-bottom:16px;">Get notified when the truck is near your street — even when the app is closed. Just <strong>R15/month</strong>.</p>
+        <button onclick="openPayModal()" style="width:100%; padding:14px; background:#27ae60; color:white; border:none; border-radius:12px; font-size:0.95rem; font-weight:900; cursor:pointer;">UPGRADE TO PRO — R15/month</button>
+        <button onclick="document.getElementById('pro-gate').style.display='none'" style="background:none; border:none; color:rgba(255,255,255,0.5); font-size:0.75rem; margin-top:10px; cursor:pointer;">No thanks, continue free</button>
     </div>
 
     <!-- COMMUNITY FEED -->
@@ -423,51 +435,41 @@
     }
     window.closePayModal = () => document.getElementById('pay-modal').style.display = 'none';
 
-    // ─── TRIAL DISPLAY ────────────────────────────────────────
+    // ─── STATUS DISPLAY ───────────────────────────────────────
     function updateTrialDisplay() {
-        const status     = localStorage.getItem('rr_user_status');
-        const trialStart = parseInt(localStorage.getItem('rr_trial_start') || '0');
-        const tag = document.getElementById('trial-tag');
-        if (status === 'active') { tag.textContent = '✓ PRO MEMBER'; tag.className = 'pro'; tag.style.display = 'block'; return; }
-        if (status === 'trial' && trialStart) {
-            const daysLeft = Math.max(0, Math.ceil((14 * 86400000 - (Date.now() - trialStart)) / 86400000));
-            document.getElementById('days-left').textContent = daysLeft;
-            tag.className     = daysLeft <= 2 ? 'expired' : '';
-            tag.style.display = 'block'; return;
+        const status = localStorage.getItem('rr_user_status');
+        const tag    = document.getElementById('trial-tag');
+        if (status === 'active') {
+            tag.textContent   = '✓ PRO MEMBER';
+            tag.className     = 'pro';
+            tag.style.display = 'block';
+        } else {
+            tag.style.display = 'none';
         }
-        tag.style.display = 'none';
     }
 
     // ─── SUBSCRIPTION CHECK ───────────────────────────────────
+    // Free tier: map, feed, logging — open to everyone
+    // Pro tier (R15/month): push notifications
     function checkSubscription() {
-        const status     = localStorage.getItem('rr_user_status');
-        const trialStart = parseInt(localStorage.getItem('rr_trial_start') || '0');
-        // Admin preview mode — bypass all gates (expires after 1 hour)
+        const status = localStorage.getItem('rr_user_status');
+        // Admin preview mode — bypass gate (expires after 1 hour)
         const adminPreview = parseInt(localStorage.getItem('rr_admin_preview') || '0');
         if (adminPreview && Date.now() - adminPreview < 3600000) {
             updateTrialDisplay(); loadData(); loadRouteLearning(); showNotifBanner(); return;
         } else if (adminPreview) {
-            localStorage.removeItem('rr_admin_preview'); // expired, clean up
+            localStorage.removeItem('rr_admin_preview');
         }
+        // First visit — show welcome gate
         if (!status) { document.getElementById('subscription-gate').style.display = 'flex'; return; }
-        if (status === 'trial' && Date.now() - trialStart > 14 * 86400000) { lockAppForPayment(); return; }
+        // Everyone else — load app freely
         updateTrialDisplay(); loadData(); loadRouteLearning(); showNotifBanner();
     }
-    window.startTrial = () => {
-        localStorage.setItem('rr_user_status', 'trial');
-        localStorage.setItem('rr_trial_start', Date.now().toString());
+    window.startFree = () => {
+        localStorage.setItem('rr_user_status', 'free');
         document.getElementById('subscription-gate').style.display = 'none';
         updateTrialDisplay(); updateStarUI(); loadData(); loadRouteLearning(); showNotifBanner();
     };
-    function lockAppForPayment() {
-        document.getElementById('subscription-gate').style.display = 'flex';
-        document.getElementById('gate-title').textContent = 'Trial Expired';
-        document.getElementById('gate-desc').innerHTML = 'To keep tracking live, support the community for <strong>R15/month</strong> via Zapper.';
-        const btn = document.getElementById('gate-button');
-        btn.textContent = 'SUBSCRIBE — R15/month'; btn.className = 'pay';
-        btn.onclick = () => { document.getElementById('subscription-gate').style.display = 'none'; openPayModal(); };
-        updateTrialDisplay();
-    }
 
     // ─── STAR / RANK ──────────────────────────────────────────
     function updateStarUI() {
@@ -541,14 +543,29 @@
     // Also shows an in-app banner to prompt permission.
     function showNotifBanner() {
         if (!('Notification' in window)) return;
-        if (Notification.permission === 'default') {
+        const status = localStorage.getItem('rr_user_status');
+        // Show banner to everyone who hasn't enabled yet
+        if (Notification.permission === 'default' || (status !== 'active' && Notification.permission !== 'granted')) {
             document.getElementById('notif-banner').style.display = 'block';
         }
     }
+    // Called when any user taps "Enable Alerts"
+    window.handleNotifRequest = () => {
+        const status = localStorage.getItem('rr_user_status');
+        if (status === 'active') {
+            // Pro user — request permission directly
+            requestPushPermission();
+        } else {
+            // Free user — show Pro upgrade prompt
+            document.getElementById('notif-banner').style.display = 'none';
+            document.getElementById('pro-gate').style.display = 'block';
+        }
+    };
     window.requestPushPermission = async () => {
         if (!('Notification' in window)) { showToast('Notifications not supported on this browser.'); return; }
         const result = await Notification.requestPermission();
         document.getElementById('notif-banner').style.display = 'none';
+        document.getElementById('pro-gate').style.display = 'none';
         if (result === 'granted') {
             showToast('🔔 Alerts enabled! You\'ll be notified when the truck is near.');
             localStorage.setItem('rr_notif', 'granted');

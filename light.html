@@ -414,7 +414,6 @@
     const checkDates   = [...new Set([sastDate, utcDate, yesterdayStr])];
     const today        = sastDate;
     const routeRef     = ref(db, `routes/${muni}/${today}`);
-    console.log('DEBUG — checking dates:', checkDates, '| muni:', muni);
     const altRouteRef  = utcDate !== sastDate ? ref(db, `routes/${muni}/${utcDate}`) : null;
 
     // ─── UTILS ────────────────────────────────────────────────
@@ -696,7 +695,6 @@
                 if (seen.has(e.timestamp)) return false;
                 seen.add(e.timestamp); return true;
             });
-            console.log('DEBUG — total entries after merge:', allEntries.length);
 
             if (!allEntries.length) {
                 noRep.style.display   = 'block';
@@ -715,8 +713,6 @@
     }
 
     function renderData(entries, feedEl, noRep, etaEl, lastEl, cntEl, emptyEl) {
-            console.log('DEBUG — renderData called with', entries.length, 'entries');
-            entries.forEach(e => console.log('  entry:', new Date(e.timestamp).toLocaleTimeString(), '| street:', e.street, '| lat:', e.lat));
             noRep.style.display   = 'none';
             emptyEl.style.display = 'none';
             feedEl.querySelectorAll('.feed-item').forEach(n => n.remove());

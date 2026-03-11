@@ -698,7 +698,7 @@
             mapMarkers = [];
 
             // Dots — show last 2 hours only
-            const twoHrsAgo = Date.now() - 7200000;
+            const twoHrsAgo = Date.now() - 86400000; // full day
             const recent    = entries.filter(e => e.timestamp > twoHrsAgo);
 
             // ── Breadcrumb trail — draw polyline through all GPS-logged points ──

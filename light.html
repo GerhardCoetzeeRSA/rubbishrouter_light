@@ -408,13 +408,13 @@
     }
 
     // Use SAST date (UTC+2) as primary key — matches when logs were saved
-    const sastDate  = new Date(Date.now() + 2 * 3600000).toISOString().split('T')[0];
-    const utcDate   = new Date().toISOString().split('T')[0];
-    const today     = sastDate; // primary date key
-    const routeRef  = ref(db, `routes/${muni}/${today}`);
-    console.log('DEBUG — SAST date:', sastDate, '| UTC date:', utcDate, '| muni:', muni);
-    // Also watch yesterday's UTC key for entries logged around midnight SAST
-    const yesterdayUTC = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+    const sastDate     = new Date(Date.now() + 2 * 3600000).toISOString().split('T')[0];
+    const utcDate      = new Date().toISOString().split('T')[0];
+    const yesterdayStr = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+    const checkDates   = [...new Set([sastDate, utcDate, yesterdayStr])];
+    const today        = sastDate;
+    const routeRef     = ref(db, `routes/${muni}/${today}`);
+    console.log('DEBUG — checking dates:', checkDates, '| muni:', muni);
     const altRouteRef  = utcDate !== sastDate ? ref(db, `routes/${muni}/${utcDate}`) : null;
 
     // ─── UTILS ────────────────────────────────────────────────
@@ -671,35 +671,34 @@
 
     // ─── LIVE DATA ────────────────────────────────────────────
     function loadData() {
-        onValue(routeRef, (snap) => {
+        // Fetch all date keys and merge — same logic as admin panel
+        Promise.all(
+            checkDates.map(d => get(ref(db, `routes/${muni}/${d}`)))
+        ).then(snaps => {
             const feedEl  = document.getElementById('feed-list');
             const noRep   = document.getElementById('no-reports-msg');
             const etaEl   = document.getElementById('eta-display');
             const lastEl  = document.getElementById('last-ping-time');
-            // Safety check — if Leaflet hasn't loaded yet, retry in 500ms
-            if (!window.L || !window.L.polyline) { setTimeout(loadData, 500); return; }
             const cntEl   = document.getElementById('today-count');
             const emptyEl = document.getElementById('feed-empty');
+            if (!window.L || !window.L.polyline) { setTimeout(loadData, 500); return; }
 
-            feedEl.querySelectorAll('.feed-item').forEach(n => n.remove());
+            let allEntries = [];
+            snaps.forEach(snap => {
+                if (snap.exists()) {
+                    const vals = Object.values(snap.val()).filter(e => e && e.timestamp);
+                    allEntries = allEntries.concat(vals);
+                }
+            });
+            // Deduplicate by timestamp
+            const seen = new Set();
+            allEntries = allEntries.filter(e => {
+                if (seen.has(e.timestamp)) return false;
+                seen.add(e.timestamp); return true;
+            });
+            console.log('DEBUG — total entries after merge:', allEntries.length);
 
-            // Merge entries from primary date key + alternate UTC date key
-            let rawEntries = snap.exists() ? Object.values(snap.val()) : [];
-
-            // Also pull alternate date ref if timezone split (once)
-            if (altRouteRef) {
-                get(altRouteRef).then(altSnap => {
-                    if (altSnap.exists()) {
-                        const altEntries = Object.values(altSnap.val()).filter(e => e && e.timestamp);
-                        if (altEntries.length) {
-                            const merged = [...rawEntries.filter(e => e && e.timestamp), ...altEntries];
-                            renderData(merged, feedEl, noRep, etaEl, lastEl, cntEl, emptyEl);
-                        }
-                    }
-                }).catch(() => {});
-            }
-
-            if (!rawEntries.length) {
+            if (!allEntries.length) {
                 noRep.style.display   = 'block';
                 etaEl.textContent     = 'No Reports Yet';
                 etaEl.style.color     = '#95a5a6';
@@ -708,9 +707,11 @@
                 emptyEl.style.display = 'block';
                 return;
             }
-
-            renderData(rawEntries.filter(e => e && e.timestamp), feedEl, noRep, etaEl, lastEl, cntEl, emptyEl);
+            renderData(allEntries, feedEl, noRep, etaEl, lastEl, cntEl, emptyEl);
         });
+
+        // Keep live updates on primary date key
+        onValue(routeRef, () => loadData());
     }
 
     function renderData(entries, feedEl, noRep, etaEl, lastEl, cntEl, emptyEl) {

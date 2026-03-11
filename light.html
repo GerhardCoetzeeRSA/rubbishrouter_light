@@ -407,8 +407,15 @@
             }).catch(() => {});
     }
 
-    const today    = new Date().toISOString().split('T')[0];
-    const routeRef = ref(db, `routes/${muni}/${today}`);
+    // Use SAST date (UTC+2) as primary key — matches when logs were saved
+    const sastDate  = new Date(Date.now() + 2 * 3600000).toISOString().split('T')[0];
+    const utcDate   = new Date().toISOString().split('T')[0];
+    const today     = sastDate; // primary date key
+    const routeRef  = ref(db, `routes/${muni}/${today}`);
+    console.log('DEBUG — SAST date:', sastDate, '| UTC date:', utcDate, '| muni:', muni);
+    // Also watch yesterday's UTC key for entries logged around midnight SAST
+    const yesterdayUTC = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+    const altRouteRef  = utcDate !== sastDate ? ref(db, `routes/${muni}/${utcDate}`) : null;
 
     // ─── UTILS ────────────────────────────────────────────────
     function showToast(msg) {
@@ -676,7 +683,23 @@
 
             feedEl.querySelectorAll('.feed-item').forEach(n => n.remove());
 
-            if (!snap.exists()) {
+            // Merge entries from primary date key + alternate UTC date key
+            let rawEntries = snap.exists() ? Object.values(snap.val()) : [];
+
+            // Also pull alternate date ref if timezone split (once)
+            if (altRouteRef) {
+                get(altRouteRef).then(altSnap => {
+                    if (altSnap.exists()) {
+                        const altEntries = Object.values(altSnap.val()).filter(e => e && e.timestamp);
+                        if (altEntries.length) {
+                            const merged = [...rawEntries.filter(e => e && e.timestamp), ...altEntries];
+                            renderData(merged, feedEl, noRep, etaEl, lastEl, cntEl, emptyEl);
+                        }
+                    }
+                }).catch(() => {});
+            }
+
+            if (!rawEntries.length) {
                 noRep.style.display   = 'block';
                 etaEl.textContent     = 'No Reports Yet';
                 etaEl.style.color     = '#95a5a6';
@@ -686,10 +709,16 @@
                 return;
             }
 
+            renderData(rawEntries.filter(e => e && e.timestamp), feedEl, noRep, etaEl, lastEl, cntEl, emptyEl);
+        });
+    }
+
+    function renderData(entries, feedEl, noRep, etaEl, lastEl, cntEl, emptyEl) {
+            console.log('DEBUG — renderData called with', entries.length, 'entries');
+            entries.forEach(e => console.log('  entry:', new Date(e.timestamp).toLocaleTimeString(), '| street:', e.street, '| lat:', e.lat));
             noRep.style.display   = 'none';
             emptyEl.style.display = 'none';
-
-            const entries = Object.values(snap.val()).filter(e => e && e.timestamp);
+            feedEl.querySelectorAll('.feed-item').forEach(n => n.remove());
             cntEl.textContent = `${entries.length} today`;
             entries.sort((a, b) => a.timestamp - b.timestamp);
 
@@ -801,7 +830,7 @@
                 // Track last street for WhatsApp share
                 if (entry.street) lastStreetLogged = entry.street;
             });
-        });
+    }
 
         // ── ADS: Monthly partner (prominent) + Weekly rotating (subtle) ──
         // Monthly partners (type='monthly') are always shown as a featured banner.
@@ -840,7 +869,6 @@
                 banner.onclick = () => { if (ad.url) window.open(ad.url, '_blank'); };
             }
         });
-    }
 
     // ─── INIT ─────────────────────────────────────────────────
     updateStarUI();

@@ -7,21 +7,14 @@
     <meta http-equiv="Expires" content="0">
     <title>RubbishRouter | Live Map</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-    <meta http-equiv="Pragma" content="no-cache">
-    <meta http-equiv="Expires" content="0">
     <!-- Leaflet -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.css"/>
+    <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.js"></script>
     <script>
-        // Init Leaflet BEFORE the module script runs.
-        // Must be a regular (non-module) script so L is available globally.
-        // We defer actual map creation until DOMContentLoaded so the
-        // #map-canvas div has its CSS height applied.
         let leafletMap, mapMarkers = [];
         document.addEventListener('DOMContentLoaded', () => {
             leafletMap = L.map('map-canvas', {
-                center:      [-26.7145, 27.0966], // default: Potchefstroom
+                center:      [-26.7145, 27.0966],
                 zoom:        14,
                 zoomControl: true,
                 attributionControl: false,
@@ -32,7 +25,6 @@
             L.control.attribution({ position: 'bottomright', prefix: '' })
                 .addAttribution('© <a href="https://openstreetmap.org">OSM</a>')
                 .addTo(leafletMap);
-            // Force Leaflet to recalculate size after CSS layout settles
             setTimeout(() => leafletMap.invalidateSize(), 300);
         });
     </script>
@@ -234,6 +226,7 @@
         <a href="index.html">← Towns</a>
         <h1>RubbishRouter</h1>
         <div class="muni" id="muni-label">Loading...</div>
+        <div id="powered-by" style="margin-top:8px; font-size:11px; opacity:0.75; font-style:italic; letter-spacing:0.5px;">Powered by residents of <span id="powered-muni"></span></div>
     </div>
 </div>
 
@@ -364,8 +357,9 @@
     // ─── MUNICIPALITY ─────────────────────────────────────────
     const urlParams = new URLSearchParams(window.location.search);
     const muni = urlParams.get('muni') || 'Potchefstroom';
-    document.getElementById('muni-label').textContent = muni;
-    document.getElementById('pa-muni').textContent    = muni;
+    document.getElementById('muni-label').textContent  = muni;
+    document.getElementById('powered-muni').textContent = muni + '.';
+    document.getElementById('pa-muni').textContent      = muni;
     document.title = `RubbishRouter | ${muni}`;
     localStorage.setItem('rr_last_muni', muni); // so pay.html can return here
 
@@ -456,14 +450,14 @@
         // Admin preview mode — bypass gate (expires after 1 hour)
         const adminPreview = parseInt(localStorage.getItem('rr_admin_preview') || '0');
         if (adminPreview && Date.now() - adminPreview < 3600000) {
-            updateTrialDisplay(); loadData(); loadRouteLearning(); showNotifBanner(); return;
+            updateTrialDisplay(); loadData(); loadRouteLearning(); showNotifBanner(); preFetchGPS(); return;
         } else if (adminPreview) {
             localStorage.removeItem('rr_admin_preview');
         }
         // First visit — show welcome gate
         if (!status) { document.getElementById('subscription-gate').style.display = 'flex'; return; }
         // Everyone else — load app freely
-        updateTrialDisplay(); loadData(); loadRouteLearning(); showNotifBanner();
+        updateTrialDisplay(); loadData(); loadRouteLearning(); showNotifBanner(); preFetchGPS();
     }
     window.startFree = () => {
         localStorage.setItem('rr_user_status', 'free');
@@ -486,20 +480,30 @@
 
     // ─── FEATURE 1: STREET-LEVEL LOGGING ─────────────────────
     let pendingStreet = '';
-    let pendingCoords = null; // {lat, lng} from GPS if available
+    let pendingCoords = null; // {lat, lng} from GPS
+    let gpsPromise   = null;  // resolves when GPS is ready
+
+    // Request GPS immediately on load — so it's ready when resident taps Log
+    function preFetchGPS() {
+        if (!navigator.geolocation) return;
+        gpsPromise = new Promise(resolve => {
+            navigator.geolocation.getCurrentPosition(
+                pos => {
+                    pendingCoords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+                    resolve(pendingCoords);
+                },
+                () => { pendingCoords = null; resolve(null); },
+                { timeout: 10000, maximumAge: 60000, enableHighAccuracy: true }
+            );
+        });
+    }
 
     window.showStreetInput = () => {
         document.getElementById('log-btn').style.display = 'none';
         document.getElementById('street-input-wrap').style.display = 'block';
         document.getElementById('street-name').focus();
-        // Pre-fetch GPS in background while user types
-        if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(
-                pos => { pendingCoords = { lat: pos.coords.latitude, lng: pos.coords.longitude }; },
-                ()  => { pendingCoords = null; },
-                { timeout: 8000, maximumAge: 30000 }
-            );
-        }
+        // Refresh GPS when tapped in case pre-fetch expired
+        if (!pendingCoords) preFetchGPS();
     };
 
     window.submitLog = async () => {
@@ -507,6 +511,16 @@
         document.getElementById('street-input-wrap').style.display = 'none';
         document.getElementById('log-btn').style.display = 'block';
         document.getElementById('log-btn').disabled = true;
+        document.getElementById('log-btn').textContent = 'Getting location...';
+
+        // Wait up to 5s for GPS before proceeding
+        if (!pendingCoords && gpsPromise) {
+            await Promise.race([
+                gpsPromise,
+                new Promise(r => setTimeout(r, 5000))
+            ]);
+        }
+
         document.getElementById('log-btn').textContent = 'Logging...';
         document.getElementById('street-name').value = '';
         try {
@@ -515,7 +529,6 @@
                 street:    pendingStreet || null,
                 v:         2.0
             };
-            // If we got GPS coords, save them so the marker is exact
             if (pendingCoords) {
                 payload.lat = pendingCoords.lat;
                 payload.lng = pendingCoords.lng;
@@ -529,6 +542,8 @@
                 : '✅ Logged! Your neighbors have been alerted.';
             showToast(msg);
             pendingCoords = null;
+            gpsPromise    = null;
+            preFetchGPS(); // pre-fetch for next log
         } catch(e) {
             showToast('❌ Could not log — check your connection.');
         } finally {
@@ -654,6 +669,8 @@
             const noRep   = document.getElementById('no-reports-msg');
             const etaEl   = document.getElementById('eta-display');
             const lastEl  = document.getElementById('last-ping-time');
+            // Safety check — if Leaflet hasn't loaded yet, retry in 500ms
+            if (!window.L || !window.L.polyline) { setTimeout(loadData, 500); return; }
             const cntEl   = document.getElementById('today-count');
             const emptyEl = document.getElementById('feed-empty');
 

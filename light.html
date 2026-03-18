@@ -383,11 +383,18 @@
     };
     const defaultCoords = TOWN_COORDS[muni] || [-26.7145, 27.0966];
 
-    // Centre map on correct town once Leaflet is ready
-    // (leafletMap is initialised in the inline script in <head>)
+    // Centre map — try user GPS first, fall back to town coords
     const centreMap = () => {
         if (!leafletMap) return;
-        leafletMap.setView(defaultCoords, 14);
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                pos => leafletMap.setView([pos.coords.latitude, pos.coords.longitude], 15),
+                ()  => leafletMap.setView(defaultCoords, 14),
+                { timeout: 5000, maximumAge: 60000 }
+            );
+        } else {
+            leafletMap.setView(defaultCoords, 14);
+        }
         leafletMap.invalidateSize();
     };
     if (document.readyState === 'complete') {
@@ -746,12 +753,11 @@
             }
 
             recent.forEach((entry, i) => {
+                // Only place marker if we have real GPS coords — no jitter
+                if (!entry.lat || !entry.lng) return;
                 const isLatest = (i === recent.length - 1);
-                // Use stored coords if available, else scatter near town centre
-                const jitterLat = (Math.random() - 0.5) * 0.004;
-                const jitterLng = (Math.random() - 0.5) * 0.004;
-                const lat = entry.lat || (defaultCoords[0] + jitterLat);
-                const lng = entry.lng || (defaultCoords[1] + jitterLng);
+                const lat = entry.lat;
+                const lng = entry.lng;
 
                 const iconHtml = isLatest
                     ? `<div class="truck-marker"></div>`
@@ -778,12 +784,10 @@
                 mapMarkers.push(marker);
             });
 
-            // Pan map to latest marker smoothly
-            if (recent.length > 0) {
-                const last2   = recent[recent.length - 1];
-                const lastLat = last2.lat || defaultCoords[0];
-                const lastLng = last2.lng || defaultCoords[1];
-                leafletMap.panTo([lastLat, lastLng], { animate: true, duration: 0.8 });
+            // Pan map to latest GPS-logged marker
+            const latestGPS = [...recent].reverse().find(e => e.lat && e.lng);
+            if (latestGPS) {
+                leafletMap.panTo([latestGPS.lat, latestGPS.lng], { animate: true, duration: 0.8 });
             }
 
             // ETA

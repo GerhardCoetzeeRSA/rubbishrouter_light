@@ -770,6 +770,28 @@
                 mapMarkers.push(marker);
             });
 
+            // ── Geocode street-name entries that have no GPS ──────
+            recent.filter(e => !e.lat && !e.lng && e.street).forEach(entry => {
+                const query = encodeURIComponent(`${entry.street}, ${muni}, South Africa`);
+                fetch(`https://nominatim.openstreetmap.org/search?q=${query}&format=json&limit=1`)
+                    .then(r => r.json())
+                    .then(data => {
+                        if (!data || !data[0]) return;
+                        const lat = parseFloat(data[0].lat);
+                        const lng = parseFloat(data[0].lon);
+                        const icon = L.divIcon({
+                            html: `<div class="old-marker" style="opacity:0.5;"></div>`,
+                            className: '', iconSize: [12, 12], iconAnchor: [6, 6]
+                        });
+                        const marker = L.marker([lat, lng], { icon });
+                        const minsAgo2 = Math.floor((Date.now() - entry.timestamp) / 60000);
+                        const timeStr  = minsAgo2 < 1 ? 'just now' : `${minsAgo2} min ago`;
+                        marker.bindPopup(`<b>📍 ${entry.street}</b><br>${timeStr}<br><i style="font-size:10px">approx. location</i>`, { closeButton: false, className: 'rr-popup' });
+                        marker.addTo(leafletMap);
+                        mapMarkers.push(marker);
+                    }).catch(() => {});
+            });
+
             // Pan map to latest GPS-logged marker
             const latestGPS = [...recent].reverse().find(e => e.lat && e.lng);
             if (latestGPS) {

@@ -411,7 +411,8 @@
     const sastDate     = new Date(Date.now() + 2 * 3600000).toISOString().split('T')[0];
     const utcDate      = new Date().toISOString().split('T')[0];
     const yesterdayStr = new Date(Date.now() - 86400000).toISOString().split('T')[0];
-    const checkDates   = [...new Set([sastDate, utcDate, yesterdayStr])];
+    // Only fetch today's dates (SAST + UTC) — yesterday caused old pins to show
+    const checkDates   = [...new Set([sastDate, utcDate])];
     const today        = sastDate;
     const routeRef     = ref(db, `routes/${muni}/${today}`);
     const altRouteRef  = utcDate !== sastDate ? ref(db, `routes/${muni}/${utcDate}`) : null;
@@ -724,8 +725,9 @@
             mapMarkers = [];
 
             // Dots — show last 2 hours only
-            const twoHrsAgo = Date.now() - 86400000; // full day
-            const recent    = entries.filter(e => e.timestamp > twoHrsAgo);
+            // Only show entries from today (SAST midnight onwards)
+            const sastMidnight = new Date(sastDate + 'T00:00:00+02:00').getTime();
+            const recent    = entries.filter(e => e.timestamp >= sastMidnight);
 
             // ── Breadcrumb trail — draw polyline through all GPS-logged points ──
             const trailCoords = recent

@@ -736,50 +736,36 @@
             const sastMidnight = new Date(sastDate + 'T00:00:00+02:00').getTime();
             const recent    = entries.filter(e => e.timestamp >= sastMidnight);
 
-            // ── Breadcrumb trail — draw polyline through all GPS-logged points ──
-            const trailCoords = recent
-                .filter(e => e.lat && e.lng)
-                .map(e => [e.lat, e.lng]);
+            // GPS-only entries for markers and breadcrumb
+            const gpsEntries = recent.filter(e => e.lat && e.lng);
 
-            if (trailCoords.length > 1) {
-                const trail = L.polyline(trailCoords, {
-                    color: '#27ae60',
-                    weight: 3,
-                    opacity: 0.6,
-                    dashArray: '6, 8',
-                    lineJoin: 'round'
+            // ── Breadcrumb trail — connect all GPS points in time order ──
+            if (gpsEntries.length > 1) {
+                const trail = L.polyline(gpsEntries.map(e => [e.lat, e.lng]), {
+                    color: '#27ae60', weight: 3, opacity: 0.6,
+                    dashArray: '6, 8', lineJoin: 'round'
                 }).addTo(leafletMap);
                 mapMarkers.push(trail);
             }
 
-            recent.forEach((entry, i) => {
-                // Only place marker if we have real GPS coords — no jitter
-                if (!entry.lat || !entry.lng) return;
-                const isLatest = (i === recent.length - 1);
-                const lat = entry.lat;
-                const lng = entry.lng;
-
+            // ── Markers — one per GPS entry ──────────────────────
+            gpsEntries.forEach((entry, i) => {
+                const isLatest = (i === gpsEntries.length - 1);
                 const iconHtml = isLatest
                     ? `<div class="truck-marker"></div>`
                     : `<div class="old-marker"></div>`;
-
                 const icon = L.divIcon({
-                    html:      iconHtml,
-                    className: '',
-                    iconSize:  isLatest ? [22, 22] : [12, 12],
+                    html: iconHtml, className: '',
+                    iconSize:   isLatest ? [22, 22] : [12, 12],
                     iconAnchor: isLatest ? [11, 11] : [6, 6],
                 });
-
-                const marker = L.marker([lat, lng], { icon });
-
-                // Popup showing street name + time if available
+                const marker = L.marker([entry.lat, entry.lng], { icon });
                 const minsAgo2 = Math.floor((Date.now() - entry.timestamp) / 60000);
                 const timeStr  = minsAgo2 < 1 ? 'just now' : `${minsAgo2} min ago`;
                 const popupTxt = entry.street
                     ? `<b>📍 ${entry.street}</b><br>${timeStr}`
                     : `🗑️ Truck logged<br>${timeStr}`;
                 marker.bindPopup(popupTxt, { closeButton: false, className: 'rr-popup' });
-
                 marker.addTo(leafletMap);
                 mapMarkers.push(marker);
             });

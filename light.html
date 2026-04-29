@@ -507,7 +507,7 @@
                     resolve(pendingCoords);
                 },
                 () => { pendingCoords = null; resolve(null); },
-                { timeout: 10000, maximumAge: 60000, enableHighAccuracy: true }
+                { timeout: 3000, maximumAge: 60000, enableHighAccuracy: true }
             );
         });
     }
@@ -525,17 +525,16 @@
         document.getElementById('street-input-wrap').style.display = 'none';
         document.getElementById('log-btn').style.display = 'block';
         document.getElementById('log-btn').disabled = true;
-        document.getElementById('log-btn').textContent = 'Getting location...';
+        document.getElementById('log-btn').textContent = 'Logging...';
 
-        // Wait up to 5s for GPS before proceeding
+        // Wait max 2s for GPS — if not ready, log without coords (geocode will handle it)
         if (!pendingCoords && gpsPromise) {
             await Promise.race([
                 gpsPromise,
-                new Promise(r => setTimeout(r, 5000))
+                new Promise(r => setTimeout(r, 2000))
             ]);
         }
 
-        document.getElementById('log-btn').textContent = 'Logging...';
         document.getElementById('street-name').value = '';
         try {
             const payload = {

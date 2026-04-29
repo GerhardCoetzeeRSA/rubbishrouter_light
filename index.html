@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <title>RubbishRouter | Select Your Area</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
@@ -90,7 +91,7 @@
     const db  = getDatabase(app);
 
     const REGIONS = [
-        { label: "🏘️ North West",   prefixes: ["Potchefstroom","Klerksdorp","Rustenburg","Mahikeng","Lichtenburg","Vryburg","Brits","Hartswater","Wolmaransstad","Delareyville","Carletonville"] },
+        { label: "🏘️ North West",   prefixes: ["Potchefstroom","Klerksdorp","Rustenburg","Mahikeng","Lichtenburg","Vryburg","Brits","Hartswater","Wolmaransstad","Delareyville","Carletonville","Grimbeek","Fochville"] },
         { label: "🏙️ Pretoria",     prefixes: ["Pretoria"] },
         { label: "🏙️ Johannesburg", prefixes: ["Johannesburg","Soweto","Sandton","Randburg","Roodepoort"] },
         { label: "🏙️ Cape Town",    prefixes: ["Cape Town","Bellville","Stellenbosch","Somerset West","Paarl"] },
@@ -132,7 +133,6 @@
 
             const regionDiv = document.createElement('div');
             regionDiv.className = 'region';
-
             regionDiv.innerHTML = `<div class="region-header">${region.label}</div>`;
 
             const tilesDiv = document.createElement('div');
